@@ -41,10 +41,22 @@ and it prints the line to add manually.
 claude-viewer update
 ```
 
-Shells out to `go install github.com/rw3iss/claude-viewer/cmd/claude-viewer@latest`,
-which fetches the newest tagged release (or `main` if no tag), builds it, and
-replaces the binary in `$GOBIN` / `$GOPATH/bin` / `~/.local/bin`. Requires Go
-in PATH; if not available, the command prints the manual install one-liner.
+The update command tries strategies in order:
+
+1. **Local git checkout** — if one is found at `$CLAUDE_VIEWER_SRC`, or
+   `~/Sites/tools/claude-viewer`, `~/src/claude-viewer`, `~/code/claude-viewer`,
+   `~/Code/claude-viewer`, `~/dev/claude-viewer`, or `~/projects/claude-viewer`,
+   it runs `git pull --ff-only && make install` there. Uses whatever git auth
+   you already have (typically SSH), so no GitHub token needed.
+2. **`go install`** — falls back to `go install github.com/rw3iss/claude-viewer/cmd/claude-viewer@latest`.
+   For public repos this just works via the Go module proxy. For private repos
+   you need:
+   ```sh
+   export GOPRIVATE=github.com/rw3iss/*
+   git config --global url."git@github.com:".insteadOf "https://github.com/"
+   ```
+3. **Manual** — if Go isn't installed and there's no checkout, the command
+   prints the installer one-liner.
 
 For binary-only users (no Go toolchain), re-run the installer:
 ```sh

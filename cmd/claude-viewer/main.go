@@ -118,9 +118,27 @@ Subcommands:
 `)
 }
 
+// runUpdate refreshes the binary. Strategies, in order:
+//   1) If a git checkout is found (via CLAUDE_VIEWER_SRC, or known dirs),
+//      run 'git pull' + 'make install' there. Uses whatever auth git
+//      already has (typically SSH), avoiding go install's HTTPS-auth issues.
+//   2) Else 'go install <repo>@latest'. Public repos go through proxy and
+//      need no auth; private repos need GOPRIVATE + git insteadOf rewrite.
+//   3) Else print the manual install one-liner.
 func runUpdate() {
+	if src := findCheckout(); src != "" {
+		fmt.Println("updating from git checkout:", src)
+		if err := runIn(src, "git", "pull", "--ff-only"); err != nil {
+			die("git pull: %v", err)
+		}
+		if err := runIn(src, "make", "install"); err != nil {
+			die("make install: %v", err)
+		}
+		fmt.Println("✓ updated. Run 'claude-viewer version' to confirm.")
+		return
+	}
 	if _, err := exec.LookPath("go"); err != nil {
-		fmt.Fprintln(os.Stderr, "claude-viewer: 'go' not found in PATH.")
+		fmt.Fprintln(os.Stderr, "claude-viewer: 'go' not in PATH and no local checkout found.")
 		fmt.Fprintln(os.Stderr, "  Install Go from https://go.dev/dl, or re-run the install script:")
 		fmt.Fprintln(os.Stderr, "  curl -fsSL https://raw.githubusercontent.com/rw3iss/claude-viewer/main/scripts/install.sh | bash")
 		os.Exit(1)
@@ -131,9 +149,58 @@ func runUpdate() {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, "Hint: if this repo is private, set GOPRIVATE and configure git to use SSH:")
+		fmt.Fprintln(os.Stderr, "  export GOPRIVATE=github.com/rw3iss/*")
+		fmt.Fprintln(os.Stderr, "  git config --global url.\"git@github.com:\".insteadOf \"https://github.com/\"")
+		fmt.Fprintln(os.Stderr, "Or clone the repo and set CLAUDE_VIEWER_SRC=<path>; 'cv update' will then 'git pull && make install'.")
 		die("update failed: %v", err)
 	}
 	fmt.Println("✓ updated. Run 'claude-viewer version' to confirm.")
+}
+
+// findCheckout returns the absolute path of a claude-viewer git checkout, or "".
+func findCheckout() string {
+	if p := os.Getenv("CLAUDE_VIEWER_SRC"); p != "" {
+		if isCheckout(p) {
+			return p
+		}
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	for _, p := range []string{
+		home + "/Sites/tools/claude-viewer",
+		home + "/src/claude-viewer",
+		home + "/code/claude-viewer",
+		home + "/Code/claude-viewer",
+		home + "/dev/claude-viewer",
+		home + "/projects/claude-viewer",
+	} {
+		if isCheckout(p) {
+			return p
+		}
+	}
+	return ""
+}
+
+func isCheckout(p string) bool {
+	if _, err := os.Stat(p + "/.git"); err != nil {
+		return false
+	}
+	if _, err := os.Stat(p + "/go.mod"); err != nil {
+		return false
+	}
+	return true
+}
+
+func runIn(dir, name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 func runResetCache() {
