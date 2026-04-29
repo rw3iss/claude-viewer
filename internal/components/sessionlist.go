@@ -20,8 +20,11 @@ type SessionListInput struct {
 	IsFocused   bool
 }
 
-// SessionList renders one column: title + active group + idle group.
-// Active sessions appear at top; idle sessions are dimmed and below.
+// SessionList renders one column: title + running group + everything else.
+//
+// Sessions where a live process holds the JSONL open (Session.Running == true)
+// appear at the top with a green ● marker. Everything else follows below a
+// divider, dimmed if the mtime is older than ActiveTTL.
 func SessionList(t theme.Theme, in SessionListInput) string {
 	if in.Width < 10 {
 		in.Width = 10
@@ -45,32 +48,43 @@ func SessionList(t theme.Theme, in SessionListInput) string {
 		return b.String()
 	}
 
-	rows := make([]string, 0, len(in.Sessions))
+	// Reorder: running first (preserving relative mtime order), then the
+	// rest. Then mark divider position.
 	now := time.Now()
 	cutoff := in.ActiveTTL
 	if cutoff == 0 {
 		cutoff = 30 * time.Minute
 	}
-	activeCount := 0
-	for _, s := range in.Sessions {
-		if now.Sub(s.Mtime) <= cutoff {
-			activeCount++
+
+	type entry struct {
+		s    data.Session
+		idx  int // original index for SelectedIdx tracking
+		fade bool
+	}
+	var running, rest []entry
+	for i, s := range in.Sessions {
+		fade := now.Sub(s.Mtime) > cutoff && !s.Running
+		e := entry{s: s, idx: i, fade: fade}
+		if s.Running {
+			running = append(running, e)
+		} else {
+			rest = append(rest, e)
 		}
 	}
 
-	cur := 0
-	for i, s := range in.Sessions {
-		row := renderRow(t, s, in.Width, i == in.SelectedIdx, now.Sub(s.Mtime) <= cutoff)
-		if i == activeCount && activeCount > 0 && activeCount < len(in.Sessions) {
-			bw := in.Width - 2
-			if bw < 1 {
-				bw = 1
-			}
-			rows = append(rows, t.Border().Render(strings.Repeat("─", bw)))
-			cur++
+	rows := make([]string, 0, len(in.Sessions)+1)
+	for _, e := range running {
+		rows = append(rows, renderRow(t, e.s, in.Width, e.idx == in.SelectedIdx, e.fade))
+	}
+	if len(running) > 0 && len(rest) > 0 {
+		bw := in.Width - 2
+		if bw < 1 {
+			bw = 1
 		}
-		rows = append(rows, row)
-		cur++
+		rows = append(rows, t.Border().Render(strings.Repeat("─", bw)))
+	}
+	for _, e := range rest {
+		rows = append(rows, renderRow(t, e.s, in.Width, e.idx == in.SelectedIdx, e.fade))
 	}
 
 	// Scroll: keep selected in view
@@ -89,22 +103,29 @@ func SessionList(t theme.Theme, in SessionListInput) string {
 	return b.String()
 }
 
-func renderRow(t theme.Theme, s data.Session, width int, selected, active bool) string {
+func renderRow(t theme.Theme, s data.Session, width int, selected, fade bool) string {
+	// Leading marker column: green ● when a live process holds the file
+	// open, two spaces otherwise. Always 2 cells wide so columns align.
+	marker := "  "
+	if s.Running {
+		marker = t.Active().Render("●") + " "
+	}
+
 	left := s.Display()
 	if s.CustomName != "" {
 		left = s.CustomName
 	}
 	right := s.ShortUUID()
-	pad := width - lipgloss.Width(left) - lipgloss.Width(right) - 2
+	pad := width - 2 - lipgloss.Width(left) - lipgloss.Width(right) - 2
 	if pad < 1 {
 		pad = 1
 	}
-	row := left + strings.Repeat(" ", pad) + right + " "
+	row := marker + left + strings.Repeat(" ", pad) + right + " "
 
 	switch {
 	case selected:
 		return t.Selected().Width(width).Render(row)
-	case !active:
+	case fade:
 		return t.Idle().Render(row)
 	default:
 		return row

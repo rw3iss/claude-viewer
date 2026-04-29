@@ -53,6 +53,11 @@ type repo struct {
 	cfg   *config.Config
 	dirs  []ClaudeDir
 	cache *CacheStore
+
+	// running-session detection — populated by detectRunning(); cached
+	// briefly to avoid /proc thrash if Sessions() is called repeatedly.
+	runningCache map[string]bool
+	runningAt    time.Time
 }
 
 // NewRepo constructs a Repository from the user's config.
@@ -93,10 +98,24 @@ const cacheTTL = 5 * time.Minute
 func (r *repo) Sessions(d ClaudeDir) ([]Session, error) {
 	if entry, err := r.cache.Read(d.Path); err == nil && time.Since(entry.GeneratedAt) <= cacheTTL {
 		dbg.Logf("Sessions: cache HIT  dir=%s age=%s n=%d", d.Label, time.Since(entry.GeneratedAt).Truncate(time.Millisecond), len(entry.Sessions))
-		return entry.Sessions, nil
+		return r.markRunning(entry.Sessions), nil
 	}
 	dbg.Logf("Sessions: cache MISS dir=%s — refreshing", d.Label)
 	return r.SessionsRefresh(d)
+}
+
+// markRunning sets s.Running for any session whose path is held open by a
+// live process (Linux: /proc walk). Refreshes its internal cache every 3s.
+func (r *repo) markRunning(sessions []Session) []Session {
+	if r.runningCache == nil || time.Since(r.runningAt) > 3*time.Second {
+		r.runningCache = runningSessionPaths()
+		r.runningAt = time.Now()
+		dbg.Logf("running detection: %d sessions held open", len(r.runningCache))
+	}
+	for i := range sessions {
+		sessions[i].Running = r.runningCache[sessions[i].Path]
+	}
+	return sessions
 }
 
 func (r *repo) SessionsRefresh(d ClaudeDir) ([]Session, error) {
@@ -113,7 +132,7 @@ func (r *repo) SessionsRefresh(d ClaudeDir) ([]Session, error) {
 	}); err != nil {
 		dbg.Logf("cache.Write error (non-fatal): %v", err)
 	}
-	return sessions, nil
+	return r.markRunning(sessions), nil
 }
 
 func (r *repo) LookupForCwd(cwd string) (Session, ClaudeDir, bool) {

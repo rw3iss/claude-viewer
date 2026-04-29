@@ -21,6 +21,11 @@ type Session struct {
 	OrgName    string    // org of the owning ClaudeDir
 	Mtime      time.Time // file mtime
 	LineCount  int       // approx prompt count (cached)
+
+	// Running is set at query time (not persisted) when a live process
+	// holds the JSONL open. True ⇒ this session is actually running right
+	// now. Linux only via /proc walk; nil/false elsewhere.
+	Running bool `json:"-"`
 }
 
 // ShortUUID returns the first 8 chars of UUID.
