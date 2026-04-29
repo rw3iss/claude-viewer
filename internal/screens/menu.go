@@ -1,7 +1,6 @@
 package screens
 
 import (
-	"fmt"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -149,44 +148,40 @@ func (m *Menu) View() string {
 			Width:    m.width, Height: m.height,
 		})
 	}
-	hint := "←/→ page · ↑/↓ select · enter open · a all-orgs · o settings · h help · ctrl+r reload · q quit"
-	var dirRef *data.ClaudeDir
-	if m.pageIdx < len(m.dirs) {
-		d := m.dirs[m.pageIdx]
-		dirRef = &d
-	}
+	hint := "←/→ org · ↑/↓ select · enter open · a all-orgs · o settings · h help · ctrl+r reload · q quit"
 	header := components.Header(m.theme, *m.cfg, components.HeaderInput{
 		Title:   "Claude Viewer",
-		Dir:     dirRef,
 		HintRow: hint,
 		Width:   m.width,
 	})
 
-	bodyHeight := m.height - 5
+	if len(m.dirs) == 0 {
+		return header + "\n\n" + m.theme.Dim().Render("(no Claude dirs detected — press 'o' for settings)")
+	}
+
+	tabs := components.OrgTabs(m.theme, components.OrgTabsInput{
+		Dirs:        m.dirs,
+		SelectedIdx: m.pageIdx,
+		Width:       m.width,
+	})
+
+	// Header is 2 lines (line + hint), blank, tabs are 4 lines (org+border+label+border),
+	// blank, alert footer 1 line.
+	bodyHeight := m.height - 12
 	if bodyHeight < 5 {
 		bodyHeight = 5
 	}
 
-	title := "(no Claude dirs detected — press 'o' for settings)"
-	body := ""
-	if len(m.dirs) > 0 {
-		d := m.dirs[m.pageIdx]
-		title = fmt.Sprintf("Page %d/%d  ·  %s", m.pageIdx+1, len(m.dirs), m.theme.Subtitle().Render(d.Label))
-		if d.OrgName != "" {
-			title += "  " + m.theme.AccentAlt().Render("@ "+d.OrgName)
-		}
-		body = components.SessionList(m.theme, components.SessionListInput{
-			Title:       title,
-			Sessions:    m.sessions,
-			SelectedIdx: m.selected,
-			Width:       m.width - 2,
-			Height:      bodyHeight,
-			ActiveTTL:   30 * time.Minute,
-			IsFocused:   true,
-		})
-	}
+	body := components.SessionList(m.theme, components.SessionListInput{
+		Sessions:    m.sessions,
+		SelectedIdx: m.selected,
+		Width:       m.width - 2,
+		Height:      bodyHeight,
+		ActiveTTL:   30 * time.Minute,
+		IsFocused:   true,
+	})
 
 	footer := components.RenderAlert(m.theme, m.alert)
-	return header + "\n\n" + body + "\n" + footer
+	return header + "\n\n" + tabs + "\n\n" + body + "\n" + footer
 }
 

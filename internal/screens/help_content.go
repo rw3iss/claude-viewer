@@ -34,7 +34,7 @@ func helpForAllOrgs() []components.HelpSection {
 		{Title: "Misc", Entries: []components.HelpEntry{
 			{Key: "ctrl+r", Desc: "reload all dirs"},
 			{Key: "h / ?", Desc: "this help"},
-			{Key: "esc", Desc: "back to menu"},
+			{Key: "esc", Desc: "menu (back)"},
 			{Key: "q", Desc: "quit"},
 		}},
 	}
@@ -51,7 +51,7 @@ func helpForSettings() []components.HelpSection {
 		}},
 		{Title: "Misc", Entries: []components.HelpEntry{
 			{Key: "h / ?", Desc: "this help"},
-			{Key: "esc", Desc: "back to menu"},
+			{Key: "esc", Desc: "menu (back)"},
 			{Key: "q", Desc: "quit"},
 		}},
 	}
@@ -78,7 +78,7 @@ func helpForChat() []components.HelpSection {
 		}},
 		{Title: "Misc", Entries: []components.HelpEntry{
 			{Key: "h / ?", Desc: "this help"},
-			{Key: "esc", Desc: "back to menu"},
+			{Key: "esc", Desc: "menu (back)"},
 			{Key: "q", Desc: "quit"},
 		}},
 	}

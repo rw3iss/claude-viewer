@@ -335,7 +335,7 @@ func (c *Chat) View() string {
 			Width:    c.width, Height: c.height,
 		})
 	}
-	hint := "↑/↓ nav · enter open · ctrl+f search · ctrl+y copy · ctrl+o save · ctrl+l layout · ctrl+↑/↓ rows · alt+↑/↓ pane · h help · ctrl+r reload · esc back"
+	hint := "↑/↓ nav · enter open · ctrl+f search · ctrl+y copy · ctrl+o save · ctrl+l layout · ctrl+↑/↓ rows · alt+↑/↓ pane · h help · ctrl+r reload · esc menu"
 	header := components.Header(c.theme, *c.cfg, components.HeaderInput{
 		Session: &c.session,
 		Dir:     &c.dir,

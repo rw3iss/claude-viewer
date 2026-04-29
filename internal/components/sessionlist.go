@@ -26,13 +26,15 @@ func SessionList(t theme.Theme, in SessionListInput) string {
 	if in.Width < 10 {
 		in.Width = 10
 	}
-	titleStyle := t.Subtitle()
-	if in.IsFocused {
-		titleStyle = titleStyle.Bold(true)
-	}
 	var b strings.Builder
-	b.WriteString(titleStyle.Render(in.Title))
-	b.WriteString("\n")
+	if in.Title != "" {
+		titleStyle := t.Subtitle()
+		if in.IsFocused {
+			titleStyle = titleStyle.Bold(true)
+		}
+		b.WriteString(titleStyle.Render(in.Title))
+		b.WriteString("\n")
+	}
 
 	visible := in.Height - 2
 	if visible < 1 {
