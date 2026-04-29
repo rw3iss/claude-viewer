@@ -7,12 +7,15 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/rw3iss/claude-viewer/internal/app"
 	"github.com/rw3iss/claude-viewer/internal/config"
 	"github.com/rw3iss/claude-viewer/internal/data"
+	dbg "github.com/rw3iss/claude-viewer/internal/debug"
 	"github.com/rw3iss/claude-viewer/internal/keys"
 	"github.com/rw3iss/claude-viewer/internal/theme"
 	"github.com/rw3iss/claude-viewer/internal/version"
@@ -41,30 +44,55 @@ func main() {
 
 	startCwd := flag.String("dir", "", "open with the session matching this directory (defaults to $PWD)")
 	noAuto := flag.Bool("no-auto", false, "skip auto-open of cwd's session; always show menu")
+	debugFlag := flag.Bool("debug", false, "verbose logging to stderr + $XDG_CACHE_HOME/claude-viewer/debug.log")
 	flag.Parse()
+
+	if err := dbg.Init(*debugFlag); err != nil {
+		fmt.Fprintln(os.Stderr, "claude-viewer: debug init:", err)
+	}
+	defer dbg.Close()
+	defer dbg.Recover("main")
+
+	dbg.Section("startup")
+	dbg.Logf("version=%s commit=%s date=%s", version.Version, version.Commit, version.Date)
+	dbg.Logf("go=%s os=%s arch=%s", runtime.Version(), runtime.GOOS, runtime.GOARCH)
+	dbg.Logf("argv=%s", strings.Join(os.Args, " "))
+	dbg.Logf("flags: dir=%q no-auto=%v debug=%v", *startCwd, *noAuto, *debugFlag)
 
 	cwd := *startCwd
 	if cwd == "" {
 		var err error
 		cwd, err = os.Getwd()
 		if err != nil {
+			dbg.Logf("os.Getwd error: %v", err)
 			cwd = ""
 		}
 	}
+	dbg.Logf("resolved cwd=%q", cwd)
 
-	// Brief stderr feedback while we load config + scan dirs (alt-screen
-	// hides whatever was on the terminal before, but the user sees this
-	// hint during the cold start).
+	// Brief stderr feedback while we load config + scan dirs.
 	fmt.Fprint(os.Stderr, "claude-viewer: scanning sessions…\r")
 
+	dbg.Section("config")
 	cfg, err := config.Load()
 	if err != nil {
 		die("failed to load config: %v", err)
 	}
+	if cp, _ := config.Path(); cp != "" {
+		dbg.Logf("config path=%s", cp)
+	}
+	dbg.Logf("config: theme=%q layout=%q preview_size=%d preview_rows=%d",
+		cfg.Theme, cfg.Layout, cfg.PreviewSize, cfg.PreviewRows)
+	dbg.Logf("config: disabled=%v custom=%v", cfg.Disabled, cfg.Custom)
 
+	dbg.Section("repo")
 	repo, err := data.NewRepo(cfg)
 	if err != nil {
 		die("failed to init repo: %v", err)
+	}
+	for _, d := range repo.Dirs() {
+		dbg.Logf("dir: label=%-15s path=%s org=%q custom=%v disabled=%v",
+			d.Label, d.Path, d.OrgName, d.Custom, d.Disabled)
 	}
 
 	deps := app.Deps{
@@ -76,9 +104,13 @@ func main() {
 
 	if !*noAuto && cwd != "" {
 		fmt.Fprint(os.Stderr, "claude-viewer: matching cwd…           \r")
+		dbg.Section("cwd lookup")
 		if s, d, ok := repo.LookupForCwd(cwd); ok {
+			dbg.Logf("matched session=%s dir=%s project=%s", s.UUID, d.Label, s.ProjectDir)
 			deps.InitialSession = &s
 			deps.InitialDir = &d
+		} else {
+			dbg.Logf("no session matches cwd=%q", cwd)
 		}
 	}
 
@@ -86,11 +118,14 @@ func main() {
 	// anything left, but this keeps non-alt-screen invocations clean).
 	fmt.Fprint(os.Stderr, "                                       \r")
 
+	dbg.Section("tea program")
 	m := app.New(deps)
 	prog := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	if _, err := prog.Run(); err != nil {
+		dbg.Logf("tea exited with error: %v", err)
 		die("tea error: %v", err)
 	}
+	dbg.Section("clean exit")
 }
 
 func die(format string, a ...any) {
@@ -108,6 +143,7 @@ Usage:
 Flags:
   --dir DIR      open with the session matching DIR (defaults to $PWD)
   --no-auto      skip auto-open of cwd's session; show the main menu
+  --debug        verbose logging to $XDG_CACHE_HOME/claude-viewer/debug.log
 
 Subcommands:
   version        print version

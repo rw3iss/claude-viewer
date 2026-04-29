@@ -111,6 +111,42 @@ cv                       # alias for `claude-viewer`
 
 Live-reload via `fsnotify` is automatic — new prompts appear within ~300ms.
 
+## Debug mode
+
+```sh
+claude-viewer --debug         # verbose logging to stderr + log file
+cv --debug --no-auto          # same with the alias
+```
+
+When `--debug` is set, the program writes timestamped, file:line-tagged log
+entries to **both stderr and** `$XDG_CACHE_HOME/claude-viewer/debug.log`
+(typically `~/.cache/claude-viewer/debug.log` on Linux,
+`~/Library/Caches/claude-viewer/debug.log` on macOS,
+`%LocalAppData%\claude-viewer\debug.log` on Windows).
+
+What gets logged:
+
+- Startup section: version, Go runtime, OS/arch, argv, parsed flags, resolved cwd
+- Config: file path + every loaded value (theme, layout, custom dirs, etc.)
+- Repo: cache root, every detected `.claude*` dir with org name + custom/disabled flags
+- Cwd lookup: which sessions were scanned and which (if any) matched
+- Cache: HIT/MISS for every Sessions(...) call with dir + age + count
+- Session loading: per-dir count + parse time
+- Chat screen: prompt count + load time
+- tea program lifecycle markers (`tea program`, `clean exit`)
+- Panics: full stack trace + the location where it was caught (`main`, etc.)
+
+The TUI's alt-screen hides stderr while running; tail the log file in
+another terminal to watch in real time:
+
+```sh
+tail -F ~/.cache/claude-viewer/debug.log
+```
+
+If `claude-viewer` panics, the stack trace + location is dumped to both
+stderr and the log file before the terminal restores. Re-running with
+`--debug` keeps the previous trace appended at the top of the log.
+
 ## Multi-org behavior
 
 claude-viewer scans `~/.claude*/projects/` automatically. Each detected dir

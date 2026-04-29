@@ -1,12 +1,14 @@
 package data
 
 import (
+	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/rw3iss/claude-viewer/internal/config"
+	dbg "github.com/rw3iss/claude-viewer/internal/debug"
 )
 
 // Repository is the small surface UI uses for data access. It wraps disk
@@ -52,10 +54,12 @@ type repo struct {
 func NewRepo(cfg *config.Config) (Repository, error) {
 	cache, err := NewCache()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("init cache: %w", err)
 	}
+	dbg.Logf("cache root=%s", cache.Root())
 	r := &repo{cfg: cfg, cache: cache}
 	r.refreshDirs()
+	dbg.Logf("repo: %d dirs detected", len(r.dirs))
 	return r, nil
 }
 
@@ -80,38 +84,48 @@ const cacheTTL = 5 * time.Second
 
 func (r *repo) Sessions(d ClaudeDir) ([]Session, error) {
 	if entry, err := r.cache.Read(d.Path); err == nil && time.Since(entry.GeneratedAt) <= cacheTTL {
+		dbg.Logf("Sessions: cache HIT  dir=%s age=%s n=%d", d.Label, time.Since(entry.GeneratedAt).Truncate(time.Millisecond), len(entry.Sessions))
 		return entry.Sessions, nil
 	}
+	dbg.Logf("Sessions: cache MISS dir=%s — refreshing", d.Label)
 	return r.SessionsRefresh(d)
 }
 
 func (r *repo) SessionsRefresh(d ClaudeDir) ([]Session, error) {
+	t := time.Now()
 	sessions, err := LoadSessions(d)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load sessions for %s: %w", d.Path, err)
 	}
-	_ = r.cache.Write(&CacheEntry{
+	dbg.Logf("LoadSessions: dir=%s n=%d in=%s", d.Label, len(sessions), time.Since(t).Truncate(time.Millisecond))
+	if err := r.cache.Write(&CacheEntry{
 		ClaudeDirPath: d.Path,
 		Sessions:      sessions,
 		GeneratedAt:   time.Now(),
-	})
+	}); err != nil {
+		dbg.Logf("cache.Write error (non-fatal): %v", err)
+	}
 	return sessions, nil
 }
 
 func (r *repo) LookupForCwd(cwd string) (Session, ClaudeDir, bool) {
 	cwd = filepath.Clean(cwd)
+	dbg.Logf("LookupForCwd: cwd=%q", cwd)
 	type cand struct {
-		session   Session
-		dir       ClaudeDir
-		matchLen  int
+		session  Session
+		dir      ClaudeDir
+		matchLen int
 	}
 	var best *cand
+	scanned := 0
 	for _, d := range r.EnabledDirs() {
 		sessions, err := r.Sessions(d)
 		if err != nil {
+			dbg.Logf("LookupForCwd: skip dir=%s err=%v", d.Label, err)
 			continue
 		}
 		for _, s := range sessions {
+			scanned++
 			pd := s.ProjectDir
 			if pd == "" {
 				continue
@@ -128,8 +142,11 @@ func (r *repo) LookupForCwd(cwd string) (Session, ClaudeDir, bool) {
 		}
 	}
 	if best == nil {
+		dbg.Logf("LookupForCwd: no match (%d sessions scanned)", scanned)
 		return Session{}, ClaudeDir{}, false
 	}
+	dbg.Logf("LookupForCwd: match dir=%s session=%s project=%s (matchLen=%d)",
+		best.dir.Label, best.session.UUID, best.session.ProjectDir, best.matchLen)
 	return best.session, best.dir, true
 }
 

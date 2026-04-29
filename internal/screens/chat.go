@@ -18,6 +18,7 @@ import (
 	"github.com/rw3iss/claude-viewer/internal/components"
 	"github.com/rw3iss/claude-viewer/internal/config"
 	"github.com/rw3iss/claude-viewer/internal/data"
+	dbg "github.com/rw3iss/claude-viewer/internal/debug"
 	"github.com/rw3iss/claude-viewer/internal/keys"
 	"github.com/rw3iss/claude-viewer/internal/theme"
 )
@@ -84,11 +85,14 @@ func NewChat(repo data.Repository, cfg *config.Config, t theme.Theme, k keys.Map
 }
 
 func (c *Chat) loadPrompts() {
+	t := time.Now()
 	prompts, err := data.LoadPrompts(c.session.Path)
 	if err != nil {
-		c.alert = components.Alert{Text: err.Error(), Level: components.AlertErr, Expires: time.Now().Add(3 * time.Second)}
+		dbg.Logf("Chat.loadPrompts: %v", err)
+		c.alert = components.Alert{Text: fmt.Sprintf("load: %v", err), Level: components.AlertErr, Expires: time.Now().Add(3 * time.Second)}
 		return
 	}
+	dbg.Logf("Chat.loadPrompts: session=%s n=%d in=%s", c.session.UUID, len(prompts), time.Since(t).Truncate(time.Millisecond))
 	c.prompts = prompts
 	if c.cursor >= len(c.prompts) {
 		c.cursor = 0
