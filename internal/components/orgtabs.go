@@ -1,8 +1,6 @@
 package components
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rw3iss/claude-viewer/internal/data"
 	"github.com/rw3iss/claude-viewer/internal/theme"
@@ -23,8 +21,8 @@ func OrgTabs(t theme.Theme, in OrgTabsInput) string {
 }
 
 // OrgTabsWithWidths is like OrgTabs but additionally returns the visible width
-// of each rendered tab — useful for placing aligned content (e.g. usage
-// meters) directly underneath.
+// of each rendered tab "block" (max of org-line and box widths). Use those
+// widths for placing aligned content (usage meters) directly underneath.
 func OrgTabsWithWidths(t theme.Theme, in OrgTabsInput) (string, []int) {
 	if len(in.Dirs) == 0 {
 		return "", nil
@@ -32,11 +30,9 @@ func OrgTabsWithWidths(t theme.Theme, in OrgTabsInput) (string, []int) {
 	tabs := make([]string, len(in.Dirs))
 	widths := make([]int, len(in.Dirs))
 	for i, d := range in.Dirs {
-		tabs[i] = renderOrgTab(t, d, i == in.SelectedIdx)
-		// Width of the box (last line of the rendered tab) — the org line
-		// above is padded to match, so any line works.
-		lines := strings.Split(tabs[i], "\n")
-		widths[i] = lipgloss.Width(lines[len(lines)-1])
+		s, w := renderOrgTab(t, d, i == in.SelectedIdx)
+		tabs[i] = s
+		widths[i] = w
 	}
 	parts := make([]string, 0, 2*len(tabs)-1)
 	for i, tab := range tabs {
@@ -62,7 +58,10 @@ func JoinTabRow(parts []string) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, out...)
 }
 
-func renderOrgTab(t theme.Theme, d data.ClaudeDir, selected bool) string {
+// renderOrgTab returns the tab block (org line + bordered box) and its block
+// width — the max of the org-line and box visible widths. Both lines are
+// centered within that block so the column is uniform end-to-end.
+func renderOrgTab(t theme.Theme, d data.ClaudeDir, selected bool) (string, int) {
 	labelText := " " + d.Label + " "
 	if d.Custom {
 		labelText = " " + d.Label + " ★"
@@ -88,7 +87,7 @@ func renderOrgTab(t theme.Theme, d data.ClaudeDir, selected bool) string {
 	if org == "" {
 		org = "—"
 	}
-	const orgMax = 32
+	const orgMax = 40
 	if len(org) > orgMax {
 		org = org[:orgMax-1] + "…"
 	}
@@ -99,18 +98,16 @@ func renderOrgTab(t theme.Theme, d data.ClaudeDir, selected bool) string {
 		orgStyled = t.Dim().Render(org)
 	}
 
-	// Center the org above the box.
 	boxW := lipgloss.Width(box)
 	orgW := lipgloss.Width(orgStyled)
-	pad := boxW - orgW
-	if pad < 0 {
-		// org is wider than the box — let the org overflow centered;
-		// the box stays its natural width.
-		pad = 0
+	blockW := boxW
+	if orgW > blockW {
+		blockW = orgW
 	}
-	leftPad := pad / 2
-	rightPad := pad - leftPad
-	orgLine := strings.Repeat(" ", leftPad) + orgStyled + strings.Repeat(" ", rightPad)
 
-	return orgLine + "\n" + box
+	// Center both the org line and the (multi-line) box within blockW so
+	// the entire column is exactly blockW wide. Without this the box
+	// hangs left when the org overflows, and meters underneath go crooked.
+	center := lipgloss.NewStyle().Width(blockW).Align(lipgloss.Center)
+	return center.Render(orgStyled) + "\n" + center.Render(box), blockW
 }
