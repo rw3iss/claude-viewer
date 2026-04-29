@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/rw3iss/claude-viewer/internal/events"
 	"github.com/rw3iss/claude-viewer/internal/components"
 	"github.com/rw3iss/claude-viewer/internal/config"
@@ -247,11 +248,11 @@ func (m *Menu) View() string {
 		meterRow = "\n" + components.JoinTabRow(parts)
 	}
 
-	// Header is 2 lines (line + hint), blank, tabs are 4 lines, optional 2-line
-	// meter row, blank, alert footer 1 line.
-	bodyHeight := m.height - 12
-	if m.cfg.ShowUsageMeters {
-		bodyHeight -= 2
+	// Reserve vertical space dynamically: header(2) + spacer(1) + tabs +
+	// meterRow + spacer(1) + footer(1).
+	bodyHeight := m.height - 5 - lipgloss.Height(tabs)
+	if meterRow != "" {
+		bodyHeight -= lipgloss.Height(meterRow)
 	}
 	if bodyHeight < 5 {
 		bodyHeight = 5

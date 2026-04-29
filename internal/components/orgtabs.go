@@ -1,6 +1,8 @@
 package components
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rw3iss/claude-viewer/internal/data"
 	"github.com/rw3iss/claude-viewer/internal/theme"
@@ -27,15 +29,33 @@ func OrgTabsWithWidths(t theme.Theme, in OrgTabsInput) (string, []int) {
 	if len(in.Dirs) == 0 {
 		return "", nil
 	}
+
+	// First pass: compute wrapped org lines per tab + max line count so
+	// every tab gets the same vertical space (shorter orgs get top-padded
+	// with an empty line).
+	orgLinesByTab := make([][]string, len(in.Dirs))
+	maxOrgLines := 1
+	for i, d := range in.Dirs {
+		orgLinesByTab[i] = wrapOrgName(d.OrgName)
+		if n := len(orgLinesByTab[i]); n > maxOrgLines {
+			maxOrgLines = n
+		}
+	}
+	for i := range orgLinesByTab {
+		for len(orgLinesByTab[i]) < maxOrgLines {
+			orgLinesByTab[i] = append([]string{""}, orgLinesByTab[i]...)
+		}
+	}
+
 	tabs := make([]string, len(in.Dirs))
 	widths := make([]int, len(in.Dirs))
 	for i, d := range in.Dirs {
-		s, w := renderOrgTab(t, d, i == in.SelectedIdx)
+		s, w := renderOrgTab(t, d, i == in.SelectedIdx, orgLinesByTab[i])
 		tabs[i] = s
 		widths[i] = w
 	}
-	// One leading space + one space between each tab (so every tab has a
-	// uniform 1-col left margin).
+
+	// One leading space + one space between each tab (uniform 1-col margin).
 	parts := make([]string, 0, 2*len(tabs)+1)
 	parts = append(parts, " ")
 	for i, tab := range tabs {
@@ -45,6 +65,60 @@ func OrgTabsWithWidths(t theme.Theme, in OrgTabsInput) (string, []int) {
 		parts = append(parts, tab)
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Bottom, parts...), widths
+}
+
+// orgNameMaxLineWidth caps how wide a single org-name line can be — beyond
+// this we wrap (if multi-word) or truncate.
+const orgNameMaxLineWidth = 30
+
+// orgWrapThreshold — orgs at or below this width stay on one line.
+const orgWrapThreshold = 20
+
+// wrapOrgName splits a long org name across two lines at the most balanced
+// space. Returns 1 line for short or single-word names. Each line is
+// truncated to orgNameMaxLineWidth (with ellipsis) as a final guard.
+func wrapOrgName(name string) []string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return []string{"—"}
+	}
+	if lipgloss.Width(name) <= orgWrapThreshold {
+		return []string{truncOrg(name)}
+	}
+	words := strings.Fields(name)
+	if len(words) < 2 {
+		return []string{truncOrg(name)}
+	}
+
+	// Find break point that minimizes max(line1Width, line2Width).
+	bestIdx := -1
+	bestMax := 1 << 30
+	for i := 1; i < len(words); i++ {
+		l1 := strings.Join(words[:i], " ")
+		l2 := strings.Join(words[i:], " ")
+		w := lipgloss.Width(l1)
+		if w2 := lipgloss.Width(l2); w2 > w {
+			w = w2
+		}
+		if w < bestMax {
+			bestMax = w
+			bestIdx = i
+		}
+	}
+	if bestIdx < 0 {
+		return []string{truncOrg(name)}
+	}
+	return []string{
+		truncOrg(strings.Join(words[:bestIdx], " ")),
+		truncOrg(strings.Join(words[bestIdx:], " ")),
+	}
+}
+
+func truncOrg(s string) string {
+	if lipgloss.Width(s) <= orgNameMaxLineWidth {
+		return s
+	}
+	return s[:orgNameMaxLineWidth-1] + "…"
 }
 
 // JoinTabRow takes per-tab strings (e.g. usage meters) and joins them with
@@ -62,10 +136,13 @@ func JoinTabRow(parts []string) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, out...)
 }
 
-// renderOrgTab returns the tab block (org line + bordered box) and its block
-// width — the max of the org-line and box visible widths. Both lines are
-// centered within that block so the column is uniform end-to-end.
-func renderOrgTab(t theme.Theme, d data.ClaudeDir, selected bool) (string, int) {
+// renderOrgTab returns the tab block (one or more org lines + bordered box)
+// and its block width — the max of all org-line widths and box width.
+// Every line is centered within that block so the column is uniform.
+//
+// orgLines is a pre-wrapped, top-padded slice from OrgTabsWithWidths so all
+// tabs in the strip share the same height regardless of org-name length.
+func renderOrgTab(t theme.Theme, d data.ClaudeDir, selected bool, orgLines []string) (string, int) {
 	labelText := " " + d.Label + " "
 	if d.Custom {
 		labelText = " " + d.Label + " ★"
@@ -87,31 +164,37 @@ func renderOrgTab(t theme.Theme, d data.ClaudeDir, selected bool) (string, int) 
 			Render(labelText)
 	}
 
-	org := d.OrgName
-	if org == "" {
-		org = "—"
-	}
-	const orgMax = 40
-	if len(org) > orgMax {
-		org = org[:orgMax-1] + "…"
-	}
-	var orgStyled string
-	if selected {
-		orgStyled = t.AccentAlt().Bold(true).Render(org)
-	} else {
-		orgStyled = t.Dim().Render(org)
+	// Style each org line.
+	styled := make([]string, len(orgLines))
+	maxOrgW := 0
+	for i, line := range orgLines {
+		if line == "" {
+			styled[i] = ""
+			continue
+		}
+		if selected {
+			styled[i] = t.AccentAlt().Bold(true).Render(line)
+		} else {
+			styled[i] = t.Dim().Render(line)
+		}
+		if w := lipgloss.Width(styled[i]); w > maxOrgW {
+			maxOrgW = w
+		}
 	}
 
 	boxW := lipgloss.Width(box)
-	orgW := lipgloss.Width(orgStyled)
 	blockW := boxW
-	if orgW > blockW {
-		blockW = orgW
+	if maxOrgW > blockW {
+		blockW = maxOrgW
 	}
 
-	// Center both the org line and the (multi-line) box within blockW so
-	// the entire column is exactly blockW wide. Without this the box
-	// hangs left when the org overflows, and meters underneath go crooked.
+	// Center every org line and the box within blockW.
 	center := lipgloss.NewStyle().Width(blockW).Align(lipgloss.Center)
-	return center.Render(orgStyled) + "\n" + center.Render(box), blockW
+	var b strings.Builder
+	for _, l := range styled {
+		b.WriteString(center.Render(l))
+		b.WriteString("\n")
+	}
+	b.WriteString(center.Render(box))
+	return b.String(), blockW
 }
