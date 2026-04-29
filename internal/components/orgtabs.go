@@ -34,10 +34,13 @@ func OrgTabsWithWidths(t theme.Theme, in OrgTabsInput) (string, []int) {
 		tabs[i] = s
 		widths[i] = w
 	}
-	parts := make([]string, 0, 2*len(tabs)-1)
+	// One leading space + one space between each tab (so every tab has a
+	// uniform 1-col left margin).
+	parts := make([]string, 0, 2*len(tabs)+1)
+	parts = append(parts, " ")
 	for i, tab := range tabs {
 		if i > 0 {
-			parts = append(parts, "  ")
+			parts = append(parts, " ")
 		}
 		parts = append(parts, tab)
 	}
@@ -45,13 +48,14 @@ func OrgTabsWithWidths(t theme.Theme, in OrgTabsInput) (string, []int) {
 }
 
 // JoinTabRow takes per-tab strings (e.g. usage meters) and joins them with
-// the same 2-space separator OrgTabs uses, so they stay aligned beneath
-// the tab strip. Multi-line entries are stacked correctly.
+// the same 1-col leading space + 1-col separator OrgTabs uses, so they
+// stay aligned beneath the tab strip. Multi-line entries are stacked.
 func JoinTabRow(parts []string) string {
-	out := make([]string, 0, 2*len(parts)-1)
+	out := make([]string, 0, 2*len(parts)+1)
+	out = append(out, " ")
 	for i, p := range parts {
 		if i > 0 {
-			out = append(out, "  ")
+			out = append(out, " ")
 		}
 		out = append(out, p)
 	}
