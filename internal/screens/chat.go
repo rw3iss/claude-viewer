@@ -393,9 +393,14 @@ func (c *Chat) renderList(w, h int) string {
 	for i, p := range filtered {
 		date := p.Time.Format("2006-01-02")
 		var rendered []string
+		// firstMsgIdx points at the first line of the prompt itself within
+		// `rendered`. If a date-separator line was emitted, that's at index
+		// 0 and the prompt starts at 1 — otherwise the prompt is at 0.
+		firstMsgIdx := 0
 		if date != lastDate {
 			rendered = append(rendered, c.theme.Dim().Render("── "+date+" ──"))
 			lastDate = date
+			firstMsgIdx = 1
 		}
 		took := formatDelta(p.Took, p.Pending)
 		prefix := c.theme.Dim().Render(p.Time.Format("15:04:05")) + "  " + c.theme.Subtitle().Render(fmt.Sprintf("%-7s", took)) + "  "
@@ -410,7 +415,7 @@ func (c *Chat) renderList(w, h int) string {
 		rendered = append(rendered, "")
 		if i == cursorAdj {
 			cursorBlockIdx = len(blocks)
-			rendered[0] = c.theme.Selected().Render(rendered[0])
+			rendered[firstMsgIdx] = c.theme.Selected().Render(rendered[firstMsgIdx])
 		}
 		blocks = append(blocks, block{lines: rendered, isCursor: i == cursorAdj})
 	}
