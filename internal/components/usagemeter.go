@@ -10,24 +10,52 @@ import (
 	"github.com/rw3iss/claude-viewer/internal/theme"
 )
 
-// UsageMeter renders a 2-line meter (5h + 7d) sized to fit width columns.
-// Line format: `5h ████░░ 70% 4h12m`. If width is too small the countdown is
-// dropped first, then the bar shrinks.
-func UsageMeter(t theme.Theme, u *data.Usage, width int) string {
-	if u == nil {
-		return centerLine(t.Dim().Render("…"), width) + "\n" + centerLine("", width)
+// Internal meter sizing: keep content readable but bounded so a wide org
+// name doesn't stretch the bar across the whole tab block.
+const (
+	meterMinWidth = 10 // floor: even on a narrow tab keep the meter readable
+	meterMaxWidth = 20 // ceiling: beyond this the bar gets unwieldy
+	meterPadding  = 2  // empty cols on each side within the block
+)
+
+// meterContentWidth returns the per-line meter width for the given block
+// width. The meter is centered inside blockWidth with meterPadding cols of
+// breathing room left and right (clamped to [meterMinWidth, meterMaxWidth]).
+func meterContentWidth(blockWidth int) int {
+	w := blockWidth - 2*meterPadding
+	if w < meterMinWidth {
+		w = meterMinWidth
 	}
-	five := meterLine(t, "5h", u.FiveHourPct, u.FiveHourResetAt, width)
-	seven := meterLine(t, "7d", u.SevenDayPct, u.SevenDayResetAt, width)
-	return five + "\n" + seven
+	if w > meterMaxWidth {
+		w = meterMaxWidth
+	}
+	if w > blockWidth {
+		w = blockWidth
+	}
+	return w
 }
 
-// UsageMeterError renders a single dim error line, sized to width.
-func UsageMeterError(t theme.Theme, err string, width int) string {
-	if len(err) > width {
-		err = err[:width-1] + "…"
+// UsageMeter renders a 2-line meter (5h + 7d) sized to fit comfortably
+// inside blockWidth, with side padding so it doesn't span edge-to-edge.
+// Line format: `5h ████░░ 70% 4h12m`. Tightens (drops countdown, then
+// shrinks bar) when content width is small.
+func UsageMeter(t theme.Theme, u *data.Usage, blockWidth int) string {
+	mw := meterContentWidth(blockWidth)
+	if u == nil {
+		return centerLine(t.Dim().Render("…"), blockWidth) + "\n" + centerLine("", blockWidth)
 	}
-	return centerLine(t.AlertWarn().Render("usage err"), width) + "\n" + centerLine(t.Dim().Render(err), width)
+	five := meterLine(t, "5h", u.FiveHourPct, u.FiveHourResetAt, mw)
+	seven := meterLine(t, "7d", u.SevenDayPct, u.SevenDayResetAt, mw)
+	return centerLine(five, blockWidth) + "\n" + centerLine(seven, blockWidth)
+}
+
+// UsageMeterError renders a 2-line dim error block, centered in blockWidth.
+func UsageMeterError(t theme.Theme, err string, blockWidth int) string {
+	mw := meterContentWidth(blockWidth)
+	if len(err) > mw {
+		err = err[:mw-1] + "…"
+	}
+	return centerLine(t.AlertWarn().Render("usage err"), blockWidth) + "\n" + centerLine(t.Dim().Render(err), blockWidth)
 }
 
 func meterLine(t theme.Theme, label string, pct int, resetAt time.Time, totalW int) string {
