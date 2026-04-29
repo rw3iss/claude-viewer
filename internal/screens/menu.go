@@ -177,7 +177,7 @@ func (m *Menu) View() string {
 		SelectedIdx: m.selected,
 		Width:       m.width - 2,
 		Height:      bodyHeight,
-		ActiveTTL:   30 * time.Minute,
+		ActiveTTL:   m.cfg.ActiveDuration(),
 		IsFocused:   true,
 	})
 

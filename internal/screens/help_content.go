@@ -43,11 +43,14 @@ func helpForAllOrgs() []components.HelpSection {
 // helpForSettings returns help for the settings screen.
 func helpForSettings() []components.HelpSection {
 	return []components.HelpSection{
-		{Title: "Navigation", Entries: []components.HelpEntry{
+		{Title: "Directories", Entries: []components.HelpEntry{
 			{Key: "↑/↓", Desc: "select row"},
 			{Key: "space", Desc: "toggle enabled/disabled for selected dir"},
 			{Key: "n", Desc: "add a custom claude config dir (input prompt)"},
 			{Key: "d", Desc: "remove selected custom dir (auto-detected ones can't be removed)"},
+		}},
+		{Title: "Preferences", Entries: []components.HelpEntry{
+			{Key: "enter", Desc: "edit selected preference (e.g. Active session window)"},
 		}},
 		{Title: "Misc", Entries: []components.HelpEntry{
 			{Key: "h / ?", Desc: "this help"},

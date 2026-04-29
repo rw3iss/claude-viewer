@@ -2,7 +2,6 @@ package screens
 
 import (
 	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/key"
@@ -145,7 +144,7 @@ func (a *AllOrgs) View() string {
 			SelectedIdx: a.rowIdx[i],
 			Width:       colW,
 			Height:      bodyH,
-			ActiveTTL:   30 * time.Minute,
+			ActiveTTL:   a.cfg.ActiveDuration(),
 			IsFocused:   i == a.colIdx,
 		})
 	}

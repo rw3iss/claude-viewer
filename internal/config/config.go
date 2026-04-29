@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -48,6 +49,21 @@ type Config struct {
 	HeaderShowOrg  bool `toml:"header_show_org"`
 	HeaderShowCfg  bool `toml:"header_show_cfg"`
 	HeaderShowUUID bool `toml:"header_show_uuid"`
+
+	// ActiveMinutes — sessions with mtime within this window count as
+	// "active" for the purpose of the menu/all-orgs list grouping.
+	// Running sessions (process holds the file open) ignore this and are
+	// always shown as active.
+	ActiveMinutes int `toml:"active_minutes"`
+}
+
+// ActiveDuration returns the configured active-session window as a Duration,
+// falling back to 60 minutes if unset.
+func (c Config) ActiveDuration() time.Duration {
+	if c.ActiveMinutes <= 0 {
+		return 60 * time.Minute
+	}
+	return time.Duration(c.ActiveMinutes) * time.Minute
 }
 
 // Default returns sensible defaults.
@@ -62,6 +78,7 @@ func Default() Config {
 		HeaderShowOrg:  true,
 		HeaderShowCfg:  true,
 		HeaderShowUUID: true,
+		ActiveMinutes:  60,
 	}
 }
 
