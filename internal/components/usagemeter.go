@@ -12,35 +12,16 @@ import (
 
 // Internal meter sizing: keep content readable but bounded so a wide org
 // name doesn't stretch the bar across the whole tab block.
-const (
-	meterMinWidth = 10 // floor: even on a narrow tab keep the meter readable
-	meterMaxWidth = 20 // ceiling: beyond this the bar gets unwieldy
-	meterPadding  = 2  // empty cols on each side within the block
-)
-
-// meterContentWidth returns the per-line meter width for the given block
-// width. The meter is centered inside blockWidth with meterPadding cols of
-// breathing room left and right (clamped to [meterMinWidth, meterMaxWidth]).
-func meterContentWidth(blockWidth int) int {
-	w := blockWidth - 2*meterPadding
-	if w < meterMinWidth {
-		w = meterMinWidth
-	}
-	if w > meterMaxWidth {
-		w = meterMaxWidth
-	}
-	if w > blockWidth {
-		w = blockWidth
-	}
-	return w
-}
+// meterContentWidth — the meter content (bar + label + pct + countdown)
+// is rendered at a fixed 15-cols wide and centered inside the tab block.
+const meterContentWidth = 15
 
 // UsageMeter renders a 2-line meter (5h + 7d) sized to fit comfortably
 // inside blockWidth, with side padding so it doesn't span edge-to-edge.
 // Line format: `5h ████░░ 70% 4h12m`. Tightens (drops countdown, then
 // shrinks bar) when content width is small.
 func UsageMeter(t theme.Theme, u *data.Usage, blockWidth int) string {
-	mw := meterContentWidth(blockWidth)
+	mw := meterContentWidth
 	if u == nil {
 		return centerLine(t.Dim().Render("…"), blockWidth) + "\n" + centerLine("", blockWidth)
 	}
@@ -51,7 +32,7 @@ func UsageMeter(t theme.Theme, u *data.Usage, blockWidth int) string {
 
 // UsageMeterError renders a 2-line dim error block, centered in blockWidth.
 func UsageMeterError(t theme.Theme, err string, blockWidth int) string {
-	mw := meterContentWidth(blockWidth)
+	mw := meterContentWidth
 	if len(err) > mw {
 		err = err[:mw-1] + "…"
 	}
