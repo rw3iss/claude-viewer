@@ -1,0 +1,66 @@
+# goreleaser config
+# Run: goreleaser release --clean
+version: 2
+
+project_name: claude-viewer
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: claude-viewer
+    main: ./cmd/claude-viewer
+    binary: claude-viewer
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X github.com/rw3iss/claude-viewer/internal/version.Version={{.Version}}
+      - -X github.com/rw3iss/claude-viewer/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/rw3iss/claude-viewer/internal/version.Date={{.Date}}
+
+archives:
+  - format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE*
+      - docs/ARCHITECTURE.md
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ .Tag }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^chore:'
+
+# Homebrew tap (uncomment + fill once you have a tap repo)
+# brews:
+#   - tap:
+#       owner: rw3iss
+#       name: homebrew-tap
+#     homepage: https://github.com/rw3iss/claude-viewer
+#     description: TUI browser for Claude Code session history
+#     install: |
+#       bin.install "claude-viewer"
+
+# Scoop bucket (Windows)
+# scoops:
+#   - bucket:
+#       owner: rw3iss
+#       name: scoop-bucket
+#     homepage: https://github.com/rw3iss/claude-viewer
+#     description: TUI browser for Claude Code session history
