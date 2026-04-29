@@ -15,25 +15,29 @@ type OrgTabsInput struct {
 	Width       int // for overflow handling (currently informational)
 }
 
-// OrgTabs renders a horizontal strip of bordered tabs, one per ClaudeDir.
-// Each tab shows the dir label inside a rounded (or thick, when selected)
-// border, with the org name centered on the line above the box.
-//
-//	rw3iss@gmail.com's Org      rw3iss@gmail.com's Org           Vendidit
-//	╭─ .claude ─╮               ┏━━ .claude-2 ━━┓               ╭─ .claude-work ─╮
-//
-// Caller is responsible for placing the strip and providing height.
+// OrgTabs renders a horizontal strip of bordered tabs (see OrgTabsWithWidths
+// for the signature that also returns per-tab pixel widths).
 func OrgTabs(t theme.Theme, in OrgTabsInput) string {
-	if len(in.Dirs) == 0 {
-		return ""
-	}
+	s, _ := OrgTabsWithWidths(t, in)
+	return s
+}
 
+// OrgTabsWithWidths is like OrgTabs but additionally returns the visible width
+// of each rendered tab — useful for placing aligned content (e.g. usage
+// meters) directly underneath.
+func OrgTabsWithWidths(t theme.Theme, in OrgTabsInput) (string, []int) {
+	if len(in.Dirs) == 0 {
+		return "", nil
+	}
 	tabs := make([]string, len(in.Dirs))
+	widths := make([]int, len(in.Dirs))
 	for i, d := range in.Dirs {
 		tabs[i] = renderOrgTab(t, d, i == in.SelectedIdx)
+		// Width of the box (last line of the rendered tab) — the org line
+		// above is padded to match, so any line works.
+		lines := strings.Split(tabs[i], "\n")
+		widths[i] = lipgloss.Width(lines[len(lines)-1])
 	}
-
-	// Interleave a 2-space separator between tabs.
 	parts := make([]string, 0, 2*len(tabs)-1)
 	for i, tab := range tabs {
 		if i > 0 {
@@ -41,7 +45,21 @@ func OrgTabs(t theme.Theme, in OrgTabsInput) string {
 		}
 		parts = append(parts, tab)
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Bottom, parts...)
+	return lipgloss.JoinHorizontal(lipgloss.Bottom, parts...), widths
+}
+
+// JoinTabRow takes per-tab strings (e.g. usage meters) and joins them with
+// the same 2-space separator OrgTabs uses, so they stay aligned beneath
+// the tab strip. Multi-line entries are stacked correctly.
+func JoinTabRow(parts []string) string {
+	out := make([]string, 0, 2*len(parts)-1)
+	for i, p := range parts {
+		if i > 0 {
+			out = append(out, "  ")
+		}
+		out = append(out, p)
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, out...)
 }
 
 func renderOrgTab(t theme.Theme, d data.ClaudeDir, selected bool) string {

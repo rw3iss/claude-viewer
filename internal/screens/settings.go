@@ -35,11 +35,23 @@ type Settings struct {
 	helpVisible bool
 }
 
-// rowCount returns the total navigable rows = dirs + 1 prefs row (active window).
-func (s *Settings) rowCount() int { return len(s.dirs) + 1 }
+// Pref-row indices (relative to the start of the prefs section).
+const (
+	prefIdxActive int = iota
+	prefIdxUsage
+	prefCount
+)
 
-// isPrefRow returns true if s.row points to the prefs section.
+func (s *Settings) rowCount() int  { return len(s.dirs) + prefCount }
 func (s *Settings) isPrefRow() bool { return s.row >= len(s.dirs) }
+
+// prefIdx returns which pref row is selected (or -1).
+func (s *Settings) prefIdx() int {
+	if !s.isPrefRow() {
+		return -1
+	}
+	return s.row - len(s.dirs)
+}
 
 // NewSettings constructs the screen.
 func NewSettings(repo data.Repository, cfg *config.Config, t theme.Theme, k keys.Map) *Settings {
@@ -173,9 +185,24 @@ func (s *Settings) Update(msg tea.Msg) (Screen, tea.Cmd) {
 				s.refresh()
 				return s, components.AlertCmd(time.Now().UnixNano(), 3*time.Second)
 			}
+			// Boolean prefs are toggled with space.
+			switch s.prefIdx() {
+			case prefIdxUsage:
+				s.cfg.ShowUsageMeters = !s.cfg.ShowUsageMeters
+				if err := config.Save(s.cfg); err != nil {
+					s.alert = components.Alert{Text: err.Error(), Level: components.AlertErr, Expires: time.Now().Add(3 * time.Second)}
+				} else {
+					state := "off"
+					if s.cfg.ShowUsageMeters {
+						state = "on"
+					}
+					s.alert = components.Alert{Text: "usage meters " + state, Level: components.AlertOK, Expires: time.Now().Add(2 * time.Second)}
+				}
+				return s, components.AlertCmd(time.Now().UnixNano(), 2*time.Second)
+			}
 		case key.Matches(msg, s.keys.Enter):
-			// Enter on a pref row enters edit mode.
-			if s.isPrefRow() {
+			// Enter on a numeric pref row enters edit mode.
+			if s.prefIdx() == prefIdxActive {
 				s.editingPref = "active_minutes"
 				s.input.SetValue(strconv.Itoa(s.cfg.ActiveMinutes))
 				s.input.Placeholder = "minutes (1..43200)"
@@ -267,16 +294,27 @@ func (s *Settings) View() string {
 		return row
 	}
 
-	const activeRowIdx = 0 // index within prefs section (only one for now)
-	prefValue := fmt.Sprintf("%d min", s.cfg.ActiveMinutes)
+	activeVal := fmt.Sprintf("%d min", s.cfg.ActiveMinutes)
 	if s.cfg.ActiveMinutes <= 0 {
-		prefValue = "60 min (default)"
+		activeVal = "60 min (default)"
 	}
 	b.WriteString(prefRow(
 		"Active session window",
-		prefValue,
-		"sessions modified within this window count as active",
-		s.row == len(s.dirs)+activeRowIdx,
+		activeVal,
+		"enter to edit · sessions modified within this window count as active",
+		s.prefIdx() == prefIdxActive,
+	))
+	b.WriteString("\n")
+
+	usageVal := "off"
+	if s.cfg.ShowUsageMeters {
+		usageVal = "on"
+	}
+	b.WriteString(prefRow(
+		"Show usage meters",
+		usageVal,
+		"space to toggle · 5h/7d rate-limit bars under each org tab",
+		s.prefIdx() == prefIdxUsage,
 	))
 	b.WriteString("\n")
 

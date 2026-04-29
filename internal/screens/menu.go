@@ -13,6 +13,13 @@ import (
 	"github.com/rw3iss/claude-viewer/internal/theme"
 )
 
+// usageMsg is delivered when an async usage fetch completes.
+type usageMsg struct {
+	DirPath string
+	Usage   *data.Usage
+	Err     error
+}
+
 // Menu is the paged-by-org main session list.
 type Menu struct {
 	repo    data.Repository
@@ -27,15 +34,61 @@ type Menu struct {
 	sessions  []data.Session // for current page
 	selected  int
 
+	usage    map[string]*data.Usage // keyed by ClaudeDir.Path
+	usageErr map[string]string
+
 	alert       components.Alert
 	helpVisible bool
 }
 
 // NewMenu builds the main menu screen.
 func NewMenu(repo data.Repository, cfg *config.Config, t theme.Theme, k keys.Map) *Menu {
-	m := &Menu{repo: repo, cfg: cfg, theme: t, keys: k}
+	m := &Menu{
+		repo:     repo,
+		cfg:      cfg,
+		theme:    t,
+		keys:     k,
+		usage:    map[string]*data.Usage{},
+		usageErr: map[string]string{},
+	}
 	m.refresh()
 	return m
+}
+
+// fetchUsageCmd builds a tea.Cmd that resolves to a usageMsg for one dir.
+func fetchUsageCmd(repo data.Repository, d data.ClaudeDir) tea.Cmd {
+	return func() tea.Msg {
+		u, err := repo.Usage(d)
+		m := usageMsg{DirPath: d.Path, Usage: u}
+		if err != nil {
+			m.Err = err
+		}
+		return m
+	}
+}
+
+// fetchAllUsageCmd batches a fetch for every enabled dir.
+func (m *Menu) fetchAllUsageCmd(forceRefresh bool) tea.Cmd {
+	if !m.cfg.ShowUsageMeters {
+		return nil
+	}
+	cmds := make([]tea.Cmd, 0, len(m.dirs))
+	for _, d := range m.dirs {
+		dCopy := d
+		if forceRefresh {
+			cmds = append(cmds, func() tea.Msg {
+				u, err := m.repo.UsageRefresh(dCopy)
+				out := usageMsg{DirPath: dCopy.Path, Usage: u}
+				if err != nil {
+					out.Err = err
+				}
+				return out
+			})
+		} else {
+			cmds = append(cmds, fetchUsageCmd(m.repo, dCopy))
+		}
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m *Menu) refresh() {
@@ -57,8 +110,8 @@ func (m *Menu) refresh() {
 	}
 }
 
-// Init satisfies tea.Model. No initial cmd needed.
-func (m *Menu) Init() tea.Cmd { return nil }
+// Init kicks off async usage fetches when meters are enabled.
+func (m *Menu) Init() tea.Cmd { return m.fetchAllUsageCmd(false) }
 
 // SetSize updates dimensions.
 func (m *Menu) SetSize(w, h int) { m.width, m.height = w, h }
@@ -66,6 +119,14 @@ func (m *Menu) SetSize(w, h int) { m.width, m.height = w, h }
 // Update handles input.
 func (m *Menu) Update(msg tea.Msg) (Screen, tea.Cmd) {
 	switch msg := msg.(type) {
+	case usageMsg:
+		if msg.Err != nil {
+			m.usageErr[msg.DirPath] = msg.Err.Error()
+		} else {
+			delete(m.usageErr, msg.DirPath)
+			m.usage[msg.DirPath] = msg.Usage
+		}
+		return m, nil
 	case components.AlertExpiredMsg:
 		m.alert = components.Alert{}
 	case tea.KeyMsg:
@@ -128,7 +189,10 @@ func (m *Menu) Update(msg tea.Msg) (Screen, tea.Cmd) {
 					m.alert = components.Alert{Text: "reloaded", Level: components.AlertOK, Expires: time.Now().Add(2 * time.Second)}
 				}
 				m.refresh()
-				return m, components.AlertCmd(time.Now().UnixNano(), 2*time.Second)
+				return m, tea.Batch(
+					components.AlertCmd(time.Now().UnixNano(), 2*time.Second),
+					m.fetchAllUsageCmd(true),
+				)
 			}
 		}
 	}
@@ -159,15 +223,36 @@ func (m *Menu) View() string {
 		return header + "\n\n" + m.theme.Dim().Render("(no Claude dirs detected — press 'o' for settings)")
 	}
 
-	tabs := components.OrgTabs(m.theme, components.OrgTabsInput{
+	tabs, tabWidths := components.OrgTabsWithWidths(m.theme, components.OrgTabsInput{
 		Dirs:        m.dirs,
 		SelectedIdx: m.pageIdx,
 		Width:       m.width,
 	})
 
-	// Header is 2 lines (line + hint), blank, tabs are 4 lines (org+border+label+border),
-	// blank, alert footer 1 line.
+	// Optional usage meters under each tab.
+	var meterRow string
+	if m.cfg.ShowUsageMeters {
+		parts := make([]string, len(m.dirs))
+		for i, d := range m.dirs {
+			w := tabWidths[i]
+			if errMsg, has := m.usageErr[d.Path]; has {
+				parts[i] = components.UsageMeterError(m.theme, errMsg, w)
+			} else if u := m.usage[d.Path]; u != nil {
+				parts[i] = components.UsageMeter(m.theme, u, w)
+			} else {
+				// still loading
+				parts[i] = components.UsageMeter(m.theme, nil, w)
+			}
+		}
+		meterRow = "\n" + components.JoinTabRow(parts)
+	}
+
+	// Header is 2 lines (line + hint), blank, tabs are 4 lines, optional 2-line
+	// meter row, blank, alert footer 1 line.
 	bodyHeight := m.height - 12
+	if m.cfg.ShowUsageMeters {
+		bodyHeight -= 2
+	}
 	if bodyHeight < 5 {
 		bodyHeight = 5
 	}
@@ -182,6 +267,6 @@ func (m *Menu) View() string {
 	})
 
 	footer := components.RenderAlert(m.theme, m.alert)
-	return header + "\n\n" + tabs + "\n\n" + body + "\n" + footer
+	return header + "\n\n" + tabs + meterRow + "\n\n" + body + "\n" + footer
 }
 

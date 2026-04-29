@@ -47,6 +47,15 @@ type Repository interface {
 	// PrefetchAll runs SessionsRefresh on every enabled dir concurrently.
 	// Used at startup to warm the cache in parallel.
 	PrefetchAll()
+
+	// Usage returns the rate-limit snapshot for d, served from the disk
+	// cache when fresh (UsageCacheTTL). Returns nil when there's no token,
+	// or the cache is stale and a fetch hasn't completed yet — callers
+	// should kick off UsageRefresh in that case.
+	Usage(d ClaudeDir) (*Usage, error)
+
+	// UsageRefresh forces an HTTP fetch and caches it.
+	UsageRefresh(d ClaudeDir) (*Usage, error)
 }
 
 type repo struct {
@@ -213,6 +222,38 @@ func (r *repo) SetDisabled(path string, disabled bool) error {
 	}
 	r.refreshDirs()
 	return nil
+}
+
+func (r *repo) Usage(d ClaudeDir) (*Usage, error) {
+	token, err := ReadOAuthToken(d.Path)
+	if err != nil {
+		return nil, err
+	}
+	if u, err := ReadCachedUsage(r.cache.Root(), token); err == nil && !u.Stale(UsageCacheTTL) {
+		dbg.Logf("Usage: cache HIT  dir=%s age=%s 5h=%d%% 7d=%d%%",
+			d.Label, time.Since(u.FetchedAt).Truncate(time.Second), u.FiveHourPct, u.SevenDayPct)
+		return u, nil
+	}
+	dbg.Logf("Usage: cache MISS dir=%s — fetching", d.Label)
+	return r.UsageRefresh(d)
+}
+
+func (r *repo) UsageRefresh(d ClaudeDir) (*Usage, error) {
+	token, err := ReadOAuthToken(d.Path)
+	if err != nil {
+		return nil, err
+	}
+	t := time.Now()
+	u, err := FetchUsage(token)
+	if err != nil {
+		return nil, fmt.Errorf("fetch usage for %s: %w", d.Label, err)
+	}
+	dbg.Logf("FetchUsage: dir=%s 5h=%d%% 7d=%d%% in=%s",
+		d.Label, u.FiveHourPct, u.SevenDayPct, time.Since(t).Truncate(time.Millisecond))
+	if err := WriteCachedUsage(r.cache.Root(), token, u); err != nil {
+		dbg.Logf("WriteCachedUsage error (non-fatal): %v", err)
+	}
+	return u, nil
 }
 
 // PrefetchAll concurrently refreshes Sessions for every enabled dir. Errors

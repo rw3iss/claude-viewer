@@ -55,6 +55,10 @@ type Config struct {
 	// Running sessions (process holds the file open) ignore this and are
 	// always shown as active.
 	ActiveMinutes int `toml:"active_minutes"`
+
+	// ShowUsageMeters: when true, the menu's tab strip renders 5h/7d
+	// usage meters under each org tab (cached 60s, refreshed on ctrl+r).
+	ShowUsageMeters bool `toml:"show_usage_meters"`
 }
 
 // ActiveDuration returns the configured active-session window as a Duration,
