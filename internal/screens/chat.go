@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/fsnotify/fsnotify"
 
@@ -50,6 +51,7 @@ type Chat struct {
 	alert       components.Alert
 	watcher     *fsnotify.Watcher
 	watchEvents chan struct{}
+	helpVisible bool
 }
 
 // NewChat constructs a chat-detail screen.
@@ -200,50 +202,59 @@ func (c *Chat) Update(msg tea.Msg) (Screen, tea.Cmd) {
 	case components.AlertExpiredMsg:
 		c.alert = components.Alert{}
 	case tea.KeyMsg:
+		if c.helpVisible {
+			if key.Matches(msg, c.keys.Help) || key.Matches(msg, c.keys.Esc) {
+				c.helpVisible = false
+			}
+			return c, nil
+		}
 		filtered := c.filteredPrompts()
 		switch {
-		case key(c.keys.Quit, msg):
+		case key.Matches(msg, c.keys.Help):
+			c.helpVisible = true
+			return c, nil
+		case key.Matches(msg, c.keys.Quit):
 			c.stopWatcher()
 			return c, func() tea.Msg { return events.QuitAppMsg{} }
-		case key(c.keys.Esc, msg):
+		case key.Matches(msg, c.keys.Esc):
 			c.stopWatcher()
 			return c, func() tea.Msg { return events.SwitchScreenMsg{To: events.ScreenMenu} }
-		case key(c.keys.Up, msg):
+		case key.Matches(msg, c.keys.Up):
 			if c.cursor > 0 {
 				c.cursor--
 				c.refreshPreview()
 			}
-		case key(c.keys.Down, msg):
+		case key.Matches(msg, c.keys.Down):
 			if c.cursor < len(filtered)-1 {
 				c.cursor++
 				c.refreshPreview()
 			}
-		case key(c.keys.Home, msg):
+		case key.Matches(msg, c.keys.Home):
 			c.cursor = 0
 			c.refreshPreview()
-		case key(c.keys.End, msg):
+		case key.Matches(msg, c.keys.End):
 			c.cursor = len(filtered) - 1
 			if c.cursor < 0 {
 				c.cursor = 0
 			}
 			c.refreshPreview()
-		case key(c.keys.PageUp, msg):
+		case key.Matches(msg, c.keys.PageUp):
 			c.cursor -= 10
 			if c.cursor < 0 {
 				c.cursor = 0
 			}
 			c.refreshPreview()
-		case key(c.keys.PageDown, msg):
+		case key.Matches(msg, c.keys.PageDown):
 			c.cursor += 10
 			if c.cursor >= len(filtered) {
 				c.cursor = len(filtered) - 1
 			}
 			c.refreshPreview()
-		case key(c.keys.Reload, msg):
+		case key.Matches(msg, c.keys.Reload):
 			c.loadPrompts()
 			c.alert = components.Alert{Text: "reloaded", Level: components.AlertOK, Expires: time.Now().Add(2 * time.Second)}
 			return c, components.AlertCmd(time.Now().UnixNano(), 2*time.Second)
-		case key(c.keys.Layout, msg):
+		case key.Matches(msg, c.keys.Layout):
 			if c.layout == "bottom" {
 				c.layout = "right"
 			} else {
@@ -252,38 +263,38 @@ func (c *Chat) Update(msg tea.Msg) (Screen, tea.Cmd) {
 			c.cfg.Layout = c.layout
 			_ = config.Save(c.cfg)
 			c.recomputePanes()
-		case key(c.keys.PaneUp, msg):
+		case key.Matches(msg, c.keys.PaneUp):
 			if c.previewSize < 80 {
 				c.previewSize += 5
 				c.cfg.PreviewSize = c.previewSize
 				_ = config.Save(c.cfg)
 				c.recomputePanes()
 			}
-		case key(c.keys.PaneDown, msg):
+		case key.Matches(msg, c.keys.PaneDown):
 			if c.previewSize > 30 {
 				c.previewSize -= 5
 				c.cfg.PreviewSize = c.previewSize
 				_ = config.Save(c.cfg)
 				c.recomputePanes()
 			}
-		case key(c.keys.RowsUp, msg):
+		case key.Matches(msg, c.keys.RowsUp):
 			if c.previewRows < 8 {
 				c.previewRows++
 				c.cfg.PreviewRows = c.previewRows
 				_ = config.Save(c.cfg)
 			}
-		case key(c.keys.RowsDown, msg):
+		case key.Matches(msg, c.keys.RowsDown):
 			if c.previewRows > 1 {
 				c.previewRows--
 				c.cfg.PreviewRows = c.previewRows
 				_ = config.Save(c.cfg)
 			}
-		case key(c.keys.Search, msg):
+		case key.Matches(msg, c.keys.Search):
 			c.searchActive = true
 			c.searchInput.SetValue(c.filter)
 			c.searchInput.Focus()
 			return c, textinput.Blink
-		case key(c.keys.Copy, msg):
+		case key.Matches(msg, c.keys.Copy):
 			if c.cursor < len(filtered) {
 				if err := clipboard.Copy(filtered[c.cursor].FullText); err != nil {
 					c.alert = components.Alert{Text: err.Error(), Level: components.AlertErr, Expires: time.Now().Add(3 * time.Second)}
@@ -292,7 +303,7 @@ func (c *Chat) Update(msg tea.Msg) (Screen, tea.Cmd) {
 				}
 				return c, components.AlertCmd(time.Now().UnixNano(), 2*time.Second)
 			}
-		case key(c.keys.Save, msg):
+		case key.Matches(msg, c.keys.Save):
 			if c.cursor < len(filtered) {
 				name := fmt.Sprintf("claude-prompt-%s.txt", filtered[c.cursor].Time.Format("2006-01-02-150405"))
 				cwd, _ := os.Getwd()
@@ -316,7 +327,15 @@ func (c *Chat) View() string {
 	if c.width < 20 || c.height < 8 {
 		return c.theme.Dim().Render("claude-viewer: initializing…")
 	}
-	hint := "↑/↓ nav · enter copy-line · ctrl+f search · ctrl+y copy · ctrl+o save · ctrl+l layout · ctrl+↑/↓ rows · alt+↑/↓ pane · ctrl+r reload · esc back"
+	if c.helpVisible {
+		return components.RenderHelp(c.theme, components.HelpInput{
+			Title:    "Chat — Help",
+			Subtitle: c.session.Display(),
+			Sections: helpForChat(),
+			Width:    c.width, Height: c.height,
+		})
+	}
+	hint := "↑/↓ nav · enter open · ctrl+f search · ctrl+y copy · ctrl+o save · ctrl+l layout · ctrl+↑/↓ rows · alt+↑/↓ pane · h help · ctrl+r reload · esc back"
 	header := components.Header(c.theme, *c.cfg, components.HeaderInput{
 		Session: &c.session,
 		Dir:     &c.dir,

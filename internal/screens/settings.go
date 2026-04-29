@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/rw3iss/claude-viewer/internal/events"
 	"github.com/rw3iss/claude-viewer/internal/components"
 	"github.com/rw3iss/claude-viewer/internal/config"
@@ -26,9 +27,10 @@ type Settings struct {
 	dirs          []data.ClaudeDir
 	row           int
 
-	addingMode bool
-	input      textinput.Model
-	alert      components.Alert
+	addingMode  bool
+	input       textinput.Model
+	alert       components.Alert
+	helpVisible bool
 }
 
 // NewSettings constructs the screen.
@@ -91,20 +93,29 @@ func (s *Settings) Update(msg tea.Msg) (Screen, tea.Cmd) {
 	case components.AlertExpiredMsg:
 		s.alert = components.Alert{}
 	case tea.KeyMsg:
+		if s.helpVisible {
+			if key.Matches(msg, s.keys.Help) || key.Matches(msg, s.keys.Esc) {
+				s.helpVisible = false
+			}
+			return s, nil
+		}
 		switch {
-		case key(s.keys.Quit, msg):
+		case key.Matches(msg, s.keys.Help):
+			s.helpVisible = true
+			return s, nil
+		case key.Matches(msg, s.keys.Quit):
 			return s, func() tea.Msg { return events.QuitAppMsg{} }
-		case key(s.keys.Esc, msg):
+		case key.Matches(msg, s.keys.Esc):
 			return s, func() tea.Msg { return events.SwitchScreenMsg{To: events.ScreenMenu} }
-		case key(s.keys.Up, msg):
+		case key.Matches(msg, s.keys.Up):
 			if s.row > 0 {
 				s.row--
 			}
-		case key(s.keys.Down, msg):
+		case key.Matches(msg, s.keys.Down):
 			if s.row < len(s.dirs)-1 {
 				s.row++
 			}
-		case key(s.keys.Toggle, msg):
+		case key.Matches(msg, s.keys.Toggle):
 			if s.row < len(s.dirs) {
 				d := s.dirs[s.row]
 				if err := s.repo.SetDisabled(d.Path, !d.Disabled); err != nil {
@@ -113,11 +124,11 @@ func (s *Settings) Update(msg tea.Msg) (Screen, tea.Cmd) {
 				s.refresh()
 				return s, components.AlertCmd(time.Now().UnixNano(), 3*time.Second)
 			}
-		case key(s.keys.Add, msg):
+		case key.Matches(msg, s.keys.Add):
 			s.addingMode = true
 			s.input.Focus()
 			return s, textinput.Blink
-		case key(s.keys.Delete, msg):
+		case key.Matches(msg, s.keys.Delete):
 			if s.row < len(s.dirs) {
 				d := s.dirs[s.row]
 				if !d.Custom {
@@ -139,7 +150,14 @@ func (s *Settings) View() string {
 	if s.width < 20 || s.height < 8 {
 		return s.theme.Dim().Render("claude-viewer: initializing…")
 	}
-	hint := "↑/↓ select · space toggle · n add · d remove (custom only) · esc back · q quit"
+	if s.helpVisible {
+		return components.RenderHelp(s.theme, components.HelpInput{
+			Title:    "Settings — Help",
+			Sections: helpForSettings(),
+			Width:    s.width, Height: s.height,
+		})
+	}
+	hint := "↑/↓ select · space toggle · n add · d remove (custom) · h help · esc back · q quit"
 	header := components.Header(s.theme, *s.cfg, components.HeaderInput{
 		Title:   "Settings — Claude Directories",
 		HintRow: hint,

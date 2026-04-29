@@ -1,10 +1,8 @@
 package data
 
 import (
-	"bufio"
 	"encoding/json"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -108,35 +106,94 @@ func LoadSessions(c ClaudeDir) ([]Session, error) {
 	return out, nil
 }
 
-// ScanSessionMeta reads the JSONL to fill in CustomName, ProjectDir, etc.
-// Stops early once both are found (or end of file).
+// ScanSessionMeta reads just enough of the JSONL to populate CustomName +
+// ProjectDir without paying for a full-file scan on every list load.
+//
+//   - cwd is set in nearly every user/assistant entry, so the first 8 KB
+//     almost always contains it.
+//   - customTitle is appended by /rename; the latest one wins. Reading the
+//     last 16 KB and taking the most recent customTitle line catches it.
+//
+// Falls back to slug-derived ProjectDir if the file is unreadable / has no
+// cwd in its head.
 func ScanSessionMeta(s *Session) {
 	f, err := os.Open(s.Path)
 	if err != nil {
+		s.ProjectDir = strings.ReplaceAll(s.Slug, "-", "/")
 		return
 	}
 	defer f.Close()
 
-	br := bufio.NewReaderSize(f, 64*1024)
-	lines := 0
-	for {
-		line, err := br.ReadBytes('\n')
-		if len(line) > 0 {
-			lines++
-			handleSessionMetaLine(s, line)
+	info, err := f.Stat()
+	if err != nil {
+		s.ProjectDir = strings.ReplaceAll(s.Slug, "-", "/")
+		return
+	}
+	size := info.Size()
+
+	const headBytes = 8 * 1024
+	const tailBytes = 16 * 1024
+
+	// HEAD: scan for cwd
+	headLen := int64(headBytes)
+	if size < headLen {
+		headLen = size
+	}
+	head := make([]byte, headLen)
+	if _, err := f.ReadAt(head, 0); err == nil {
+		scanLines(head, s, false)
+	}
+
+	// TAIL: scan for the most-recent customTitle. Skip if file is small
+	// (we already covered everything above).
+	if size > headLen {
+		off := size - tailBytes
+		skipFirst := true
+		if off < headLen { // overlap or tiny: read remainder, no skip needed
+			off = headLen
+			skipFirst = false
 		}
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			break
+		tail := make([]byte, size-off)
+		if _, err := f.ReadAt(tail, off); err == nil {
+			scanLines(tail, s, skipFirst)
 		}
 	}
-	s.LineCount = lines
+
 	if s.ProjectDir == "" {
-		// Slug-derived fallback
 		s.ProjectDir = strings.ReplaceAll(s.Slug, "-", "/")
 	}
+}
+
+// scanLines walks newline-separated entries in buf. If skipFirstPartial is
+// true, the first incomplete line is dropped (because buf likely starts mid-line).
+func scanLines(buf []byte, s *Session, skipFirstPartial bool) {
+	start := 0
+	if skipFirstPartial {
+		if i := indexNewline(buf); i >= 0 {
+			start = i + 1
+		} else {
+			return
+		}
+	}
+	for start < len(buf) {
+		end := start
+		for end < len(buf) && buf[end] != '\n' {
+			end++
+		}
+		if end > start {
+			handleSessionMetaLine(s, buf[start:end])
+		}
+		start = end + 1
+	}
+}
+
+func indexNewline(b []byte) int {
+	for i, c := range b {
+		if c == '\n' {
+			return i
+		}
+	}
+	return -1
 }
 
 func handleSessionMetaLine(s *Session, line []byte) {

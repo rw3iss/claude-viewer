@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -94,6 +95,12 @@ func main() {
 		dbg.Logf("dir: label=%-15s path=%s org=%q custom=%v disabled=%v",
 			d.Label, d.Path, d.OrgName, d.Custom, d.Disabled)
 	}
+
+	// Warm the cache concurrently — turns serial 5+5+0.4s into max(...).
+	dbg.Section("prefetch")
+	tPre := time.Now()
+	repo.PrefetchAll()
+	dbg.Logf("PrefetchAll done in %s", time.Since(tPre).Truncate(time.Millisecond))
 
 	deps := app.Deps{
 		Repo:  repo,

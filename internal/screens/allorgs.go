@@ -5,6 +5,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/rw3iss/claude-viewer/internal/events"
 	"github.com/rw3iss/claude-viewer/internal/components"
 	"github.com/rw3iss/claude-viewer/internal/config"
@@ -27,7 +28,8 @@ type AllOrgs struct {
 	colIdx  int              // focused column
 	rowIdx  []int            // selected row per column
 
-	alert components.Alert
+	alert       components.Alert
+	helpVisible bool
 }
 
 // NewAllOrgs builds the multi-column screen.
@@ -56,28 +58,37 @@ func (a *AllOrgs) SetSize(w, h int)     { a.width, a.height = w, h }
 func (a *AllOrgs) Update(msg tea.Msg) (Screen, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if a.helpVisible {
+			if key.Matches(msg, a.keys.Help) || key.Matches(msg, a.keys.Esc) {
+				a.helpVisible = false
+			}
+			return a, nil
+		}
 		switch {
-		case key(a.keys.Esc, msg):
+		case key.Matches(msg, a.keys.Help):
+			a.helpVisible = true
+			return a, nil
+		case key.Matches(msg, a.keys.Esc):
 			return a, func() tea.Msg { return events.SwitchScreenMsg{To: events.ScreenMenu} }
-		case key(a.keys.Quit, msg):
+		case key.Matches(msg, a.keys.Quit):
 			return a, func() tea.Msg { return events.QuitAppMsg{} }
-		case key(a.keys.Left, msg):
+		case key.Matches(msg, a.keys.Left):
 			if a.colIdx > 0 {
 				a.colIdx--
 			}
-		case key(a.keys.Right, msg):
+		case key.Matches(msg, a.keys.Right):
 			if a.colIdx < len(a.dirs)-1 {
 				a.colIdx++
 			}
-		case key(a.keys.Up, msg):
+		case key.Matches(msg, a.keys.Up):
 			if a.rowIdx[a.colIdx] > 0 {
 				a.rowIdx[a.colIdx]--
 			}
-		case key(a.keys.Down, msg):
+		case key.Matches(msg, a.keys.Down):
 			if a.rowIdx[a.colIdx] < len(a.cols[a.colIdx])-1 {
 				a.rowIdx[a.colIdx]++
 			}
-		case key(a.keys.Enter, msg):
+		case key.Matches(msg, a.keys.Enter):
 			if a.colIdx < len(a.cols) && a.rowIdx[a.colIdx] < len(a.cols[a.colIdx]) {
 				s := a.cols[a.colIdx][a.rowIdx[a.colIdx]]
 				d := a.dirs[a.colIdx]
@@ -85,7 +96,7 @@ func (a *AllOrgs) Update(msg tea.Msg) (Screen, tea.Cmd) {
 					return events.SwitchScreenMsg{To: events.ScreenChat, Session: &s, Dir: &d}
 				}
 			}
-		case key(a.keys.Reload, msg):
+		case key.Matches(msg, a.keys.Reload):
 			a.refresh()
 		}
 	}
@@ -96,7 +107,14 @@ func (a *AllOrgs) View() string {
 	if a.width < 20 || a.height < 8 {
 		return a.theme.Dim().Render("claude-viewer: initializing…")
 	}
-	hint := "←/→ column · ↑/↓ row · enter open · esc back · ctrl+r reload"
+	if a.helpVisible {
+		return components.RenderHelp(a.theme, components.HelpInput{
+			Title:    "All Organizations — Help",
+			Sections: helpForAllOrgs(),
+			Width:    a.width, Height: a.height,
+		})
+	}
+	hint := "←/→ column · ↑/↓ row · enter open · h help · esc back · ctrl+r reload"
 	header := components.Header(a.theme, *a.cfg, components.HeaderInput{
 		Title:   "All Organizations",
 		HintRow: hint,

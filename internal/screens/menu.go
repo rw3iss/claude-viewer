@@ -5,6 +5,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/rw3iss/claude-viewer/internal/events"
 	"github.com/rw3iss/claude-viewer/internal/components"
 	"github.com/rw3iss/claude-viewer/internal/config"
@@ -27,7 +28,8 @@ type Menu struct {
 	sessions  []data.Session // for current page
 	selected  int
 
-	alert components.Alert
+	alert       components.Alert
+	helpVisible bool
 }
 
 // NewMenu builds the main menu screen.
@@ -68,36 +70,46 @@ func (m *Menu) Update(msg tea.Msg) (Screen, tea.Cmd) {
 	case components.AlertExpiredMsg:
 		m.alert = components.Alert{}
 	case tea.KeyMsg:
+		// Help overlay swallows all keys except its toggle / esc.
+		if m.helpVisible {
+			if key.Matches(msg, m.keys.Help) || key.Matches(msg, m.keys.Esc) {
+				m.helpVisible = false
+			}
+			return m, nil
+		}
 		switch {
-		case key(m.keys.Quit, msg):
+		case key.Matches(msg, m.keys.Help):
+			m.helpVisible = true
+			return m, nil
+		case key.Matches(msg, m.keys.Quit):
 			return m, func() tea.Msg { return events.QuitAppMsg{} }
-		case key(m.keys.Esc, msg):
+		case key.Matches(msg, m.keys.Esc):
 			return m, func() tea.Msg { return events.QuitAppMsg{} }
-		case key(m.keys.Left, msg):
+		case key.Matches(msg, m.keys.Left):
 			if len(m.dirs) > 0 {
 				m.pageIdx = (m.pageIdx - 1 + len(m.dirs)) % len(m.dirs)
 				m.selected = 0
 				m.refresh()
 			}
-		case key(m.keys.Right, msg):
+		case key.Matches(msg, m.keys.Right):
 			if len(m.dirs) > 0 {
 				m.pageIdx = (m.pageIdx + 1) % len(m.dirs)
 				m.selected = 0
 				m.refresh()
 			}
-		case key(m.keys.Up, msg):
+		case key.Matches(msg, m.keys.Up):
 			if m.selected > 0 {
 				m.selected--
 			}
-		case key(m.keys.Down, msg):
+		case key.Matches(msg, m.keys.Down):
 			if m.selected < len(m.sessions)-1 {
 				m.selected++
 			}
-		case key(m.keys.Home, msg):
+		case key.Matches(msg, m.keys.Home):
 			m.selected = 0
-		case key(m.keys.End, msg):
+		case key.Matches(msg, m.keys.End):
 			m.selected = len(m.sessions) - 1
-		case key(m.keys.Enter, msg):
+		case key.Matches(msg, m.keys.Enter):
 			if m.selected < len(m.sessions) {
 				s := m.sessions[m.selected]
 				d := m.dirs[m.pageIdx]
@@ -105,11 +117,11 @@ func (m *Menu) Update(msg tea.Msg) (Screen, tea.Cmd) {
 					return events.SwitchScreenMsg{To: events.ScreenChat, Session: &s, Dir: &d}
 				}
 			}
-		case key(m.keys.AllOrgs, msg):
+		case key.Matches(msg, m.keys.AllOrgs):
 			return m, func() tea.Msg { return events.SwitchScreenMsg{To: events.ScreenAllOrgs} }
-		case key(m.keys.Settings, msg):
+		case key.Matches(msg, m.keys.Settings):
 			return m, func() tea.Msg { return events.SwitchScreenMsg{To: events.ScreenSettings} }
-		case key(m.keys.Reload, msg):
+		case key.Matches(msg, m.keys.Reload):
 			if len(m.dirs) > 0 {
 				if _, err := m.repo.SessionsRefresh(m.dirs[m.pageIdx]); err != nil {
 					m.alert = components.Alert{Text: err.Error(), Level: components.AlertErr, Expires: time.Now().Add(3 * time.Second)}
@@ -129,7 +141,15 @@ func (m *Menu) View() string {
 	if m.width < 20 || m.height < 8 {
 		return m.theme.Dim().Render("claude-viewer: initializing…")
 	}
-	hint := fmt.Sprintf("←/→ page · ↑/↓ select · enter open · a all-orgs · o settings · ctrl+r reload · q quit")
+	if m.helpVisible {
+		return components.RenderHelp(m.theme, components.HelpInput{
+			Title:    "Main Menu — Help",
+			Subtitle: "Browse Claude session history across orgs.",
+			Sections: helpForMenu(),
+			Width:    m.width, Height: m.height,
+		})
+	}
+	hint := "←/→ page · ↑/↓ select · enter open · a all-orgs · o settings · h help · ctrl+r reload · q quit"
 	var dirRef *data.ClaudeDir
 	if m.pageIdx < len(m.dirs) {
 		d := m.dirs[m.pageIdx]
@@ -170,13 +190,3 @@ func (m *Menu) View() string {
 	return header + "\n\n" + body + "\n" + footer
 }
 
-// helper: matches key.Binding against a tea.KeyMsg
-func key(b interface{ Keys() []string }, msg tea.KeyMsg) bool {
-	s := msg.String()
-	for _, k := range b.Keys() {
-		if k == s {
-			return true
-		}
-	}
-	return false
-}

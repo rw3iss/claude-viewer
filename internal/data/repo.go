@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rw3iss/claude-viewer/internal/config"
@@ -42,6 +43,10 @@ type Repository interface {
 
 	// RemoveCustom deletes a custom-added dir from config.
 	RemoveCustom(path string) error
+
+	// PrefetchAll runs SessionsRefresh on every enabled dir concurrently.
+	// Used at startup to warm the cache in parallel.
+	PrefetchAll()
 }
 
 type repo struct {
@@ -80,7 +85,10 @@ func (r *repo) EnabledDirs() []ClaudeDir {
 	return out
 }
 
-const cacheTTL = 5 * time.Second
+// cacheTTL is intentionally generous — first paint comes from cache and a
+// re-scan is triggered on user-initiated reload (ctrl+r) or when a session
+// file is modified during a chat session (fsnotify).
+const cacheTTL = 5 * time.Minute
 
 func (r *repo) Sessions(d ClaudeDir) ([]Session, error) {
 	if entry, err := r.cache.Read(d.Path); err == nil && time.Since(entry.GeneratedAt) <= cacheTTL {
@@ -186,6 +194,27 @@ func (r *repo) SetDisabled(path string, disabled bool) error {
 	}
 	r.refreshDirs()
 	return nil
+}
+
+// PrefetchAll concurrently refreshes Sessions for every enabled dir. Errors
+// are logged (debug only) — they don't bubble up because individual dir
+// failures shouldn't fail the prefetch.
+func (r *repo) PrefetchAll() {
+	dirs := r.EnabledDirs()
+	var wg sync.WaitGroup
+	wg.Add(len(dirs))
+	for _, d := range dirs {
+		go func(d ClaudeDir) {
+			defer wg.Done()
+			if !r.cache.Stale(d.Path, cacheTTL) {
+				return
+			}
+			if _, err := r.SessionsRefresh(d); err != nil {
+				dbg.Logf("PrefetchAll: dir=%s err=%v", d.Label, err)
+			}
+		}(d)
+	}
+	wg.Wait()
 }
 
 func (r *repo) RemoveCustom(path string) error {

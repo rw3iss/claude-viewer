@@ -32,6 +32,7 @@ type Map struct {
 	Add      key.Binding
 	Toggle   key.Binding
 	Delete   key.Binding
+	Help     key.Binding
 }
 
 // Default returns the built-in keymap.
@@ -63,5 +64,6 @@ func Default() Map {
 		Add:      key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "add dir")),
 		Toggle:   key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "toggle")),
 		Delete:   key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "delete")),
+		Help:     key.NewBinding(key.WithKeys("h", "?"), key.WithHelp("h/?", "help")),
 	}
 }
