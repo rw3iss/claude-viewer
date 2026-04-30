@@ -477,21 +477,30 @@ func (c *Chat) renderList(w, h int) string {
 			firstMsgIdx = 1
 		}
 		took := formatDelta(p.Took, p.Pending)
-		prefix := c.theme.Dim().Render(p.Time.Format("15:04:05")) + "  " + c.theme.Subtitle().Render(fmt.Sprintf("%-7s", took)) + "  "
+		styledPrefix := c.theme.Dim().Render(p.Time.Format("15:04:05")) + "  " + c.theme.Subtitle().Render(fmt.Sprintf("%-7s", took)) + "  "
+		plainPrefix := p.Time.Format("15:04:05") + "  " + fmt.Sprintf("%-7s", took) + "  "
 		wrapped := wrapText(p.Text, textW, c.previewRows)
 		for j, wl := range wrapped {
 			if j == 0 {
-				rendered = append(rendered, prefix+wl)
+				rendered = append(rendered, styledPrefix+wl)
 			} else {
 				rendered = append(rendered, strings.Repeat(" ", prefixW)+wl)
 			}
 		}
+		// Trailing blank line — gives a visual gap between blocks and (when
+		// the row is selected) extends the highlight rectangle one row down.
 		rendered = append(rendered, "")
 		if i == cursorAdj {
 			cursorBlockIdx = len(blocks)
-			// Constrain the highlighted row to the list-pane width so
-			// the BG color doesn't bleed into the preview pane on the right.
-			rendered[firstMsgIdx] = c.theme.Selected().Width(w).Render(rendered[firstMsgIdx])
+			// Highlight the entire block — every line from firstMsgIdx
+			// through the trailing blank. The first line is rebuilt
+			// without the nested timestamp/took ANSI so the Selected
+			// background paints uniformly across the row.
+			plainFirst := plainPrefix + wrapped[0]
+			rendered[firstMsgIdx] = c.theme.Selected().Width(w).Render(plainFirst)
+			for j := firstMsgIdx + 1; j < len(rendered); j++ {
+				rendered[j] = c.theme.Selected().Width(w).Render(rendered[j])
+			}
 		}
 		blocks = append(blocks, block{lines: rendered, isCursor: i == cursorAdj})
 	}
