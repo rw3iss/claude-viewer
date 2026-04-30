@@ -108,12 +108,35 @@ func (c *Chat) refreshPreview() {
 		return
 	}
 	p := c.filteredPrompts()[c.cursor]
-	indent := "  "
-	lines := strings.Split(p.FullText, "\n")
-	for i, l := range lines {
-		lines[i] = indent + l
+
+	// viewport.Model doesn't word-wrap, so pre-wrap each line to the
+	// preview pane width. Reserve 4 cols (2 for the leading indent + 2
+	// for the right margin so text doesn't kiss the border).
+	wrapW := c.preview.Width - 4
+	if wrapW < 20 {
+		wrapW = 20
 	}
-	c.preview.SetContent(strings.Join(lines, "\n"))
+	wrapStyle := lipgloss.NewStyle().Width(wrapW)
+
+	var b strings.Builder
+	for i, line := range strings.Split(p.FullText, "\n") {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		// Wrap one paragraph at a time. Style.Width pads short lines but
+		// that's fine in a TUI viewport — each rendered line stays inside
+		// the preview pane width.
+		wrapped := wrapStyle.Render(line)
+		for j, sub := range strings.Split(wrapped, "\n") {
+			if j > 0 {
+				b.WriteString("\n")
+			}
+			b.WriteString("  ")
+			b.WriteString(sub)
+		}
+	}
+	c.preview.SetContent(b.String())
+	c.preview.GotoTop()
 }
 
 func (c *Chat) filteredPrompts() []data.Prompt {

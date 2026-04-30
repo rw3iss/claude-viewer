@@ -3,20 +3,25 @@
 A fast, multi-org TUI browser for Claude Code session history.
 
 Auto-detects every `~/.claude*` config dir on your machine, lets you page
-through their sessions, and drops you straight into the right session when
-you launch from inside a project directory.
+through their sessions across orgs, and drops you straight into the right
+session when you launch from inside a project directory.
 
-```
-~/Sites/blobs                                @ Vendidit · .claude-work · b3cc1052
-↑↓ nav · enter open · a all-orgs · o settings · ctrl+r reload · q quit
-
-Page 2/3  ·  .claude-work  @ Vendidit
-  ▌ blobs                                                          b3cc1052
-    ~/Sites/ven/api-server                                         ecdc8014
-    ~/Sites/ven/new                                                4ab800c2
-    ─────────────────────────────────────────────────────────
-    ~/Sites/ven/static-dev-alt-vendidit-com    (idle)              90c4ea9c
-```
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href=".github/screenshot_main_orgs.png">
+        <img src=".github/screenshot_main_orgs.png" alt="Main menu — org tabs, usage meters, sessions" />
+      </a><br/>
+      <sub><b>Main menu</b> — paged org tabs with 5h/7d usage meters, running sessions ●&nbsp;at top, last-active column.</sub>
+    </td>
+    <td width="50%" align="center">
+      <a href=".github/screenshot_settings.png">
+        <img src=".github/screenshot_settings.png" alt="Settings — directories + preferences" />
+      </a><br/>
+      <sub><b>Settings</b> — toggle/disable any <code>~/.claude*</code> dir, add custom dirs, edit preferences (active-session window, usage meters).</sub>
+    </td>
+  </tr>
+</table>
 
 ## Install
 
