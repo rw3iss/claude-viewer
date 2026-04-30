@@ -36,7 +36,8 @@ func (s Session) ShortUUID() string {
 	return s.UUID
 }
 
-// Display returns the preferred title for list rendering.
+// Display returns the preferred title for list rendering — custom name if
+// set, otherwise the abbreviated project dir.
 func (s Session) Display() string {
 	switch {
 	case s.CustomName != "":
@@ -46,6 +47,17 @@ func (s Session) Display() string {
 	default:
 		return s.Slug
 	}
+}
+
+// ProjectPath returns just the project working directory (where the session
+// was started), abbreviated to ~ for HOME. Falls back to the slug-derived
+// path if cwd wasn't recorded. Unlike Display(), this never returns the
+// custom name — useful when both pieces of info should appear side-by-side.
+func (s Session) ProjectPath() string {
+	if s.ProjectDir != "" {
+		return abbrevHome(s.ProjectDir)
+	}
+	return strings.ReplaceAll(s.Slug, "-", "/")
 }
 
 // IsActive returns true if mtime is within the cutoff (recently modified).

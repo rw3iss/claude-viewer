@@ -51,8 +51,10 @@ func buildLeft(t theme.Theme, cfg config.Config, in HeaderInput) string {
 		if cfg.HeaderShowName && s.CustomName != "" {
 			parts = append(parts, t.Highlight().Render(s.CustomName))
 		}
-		if cfg.HeaderShowDir && s.ProjectDir != "" {
-			parts = append(parts, t.Accent().Render(s.Display()))
+		if cfg.HeaderShowDir {
+			if path := s.ProjectPath(); path != "" {
+				parts = append(parts, t.Accent().Render(path))
+			}
 		}
 	}
 	return strings.Join(parts, "  ")
