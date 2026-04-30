@@ -135,11 +135,8 @@ func (c *Chat) refreshPreview() {
 	wrapStyle := lipgloss.NewStyle().Width(wrapW)
 
 	var b strings.Builder
-	if meta := previewMetaLine(c.theme, p); meta != "" {
-		b.WriteString("  ")
-		b.WriteString(meta)
-		b.WriteString("\n\n")
-	}
+	// (Token-usage meta moved to the chat-screen footer so it sits on the
+	// bottom-left, opposite the global mem indicator on the right.)
 	for i, line := range strings.Split(p.FullText, "\n") {
 		if i > 0 {
 			b.WriteString("\n")
@@ -434,11 +431,20 @@ func (c *Chat) View() string {
 		body = listView + "\n" + c.theme.Border().Render(strings.Repeat("─", borderW)) + "\n" + previewView
 	}
 
+	// Footer (left-aligned). Search input takes priority, then a transient
+	// alert, otherwise the selected prompt's token-usage meta line.
+	// The global mem indicator is appended to the right by app.View().
 	var footer string
-	if c.searchActive {
-		footer = c.theme.Highlight().Render("/ "+c.searchInput.View())
-	} else {
+	switch {
+	case c.searchActive:
+		footer = c.theme.Highlight().Render("/ " + c.searchInput.View())
+	case c.alert.Text != "":
 		footer = components.RenderAlert(c.theme, c.alert)
+	default:
+		filtered := c.filteredPrompts()
+		if c.cursor < len(filtered) {
+			footer = previewMetaLine(c.theme, filtered[c.cursor])
+		}
 	}
 	return header + "\n\n" + body + "\n" + footer
 }
