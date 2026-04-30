@@ -1,2 +1,0 @@
-<command-message>improve</command-message>
-<command-name>/improve</command-name>
