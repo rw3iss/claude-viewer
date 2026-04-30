@@ -130,17 +130,20 @@ func renderRow(t theme.Theme, s data.Session, width int, selected, fade bool) st
 
 	var row string
 	if leftAvail < 10 {
-		// Terminal too narrow — drop the last-active column to keep the
-		// name + uuid readable.
-		pad := width - 2 - lipgloss.Width(left) - lipgloss.Width(right) - 2
+		// Terminal too narrow — drop the last-active column. Still need
+		// to truncate `left` so the row fits in `width`.
+		leftAvail2 := width - 2 - lipgloss.Width(right) - 2
+		if leftAvail2 < 1 {
+			leftAvail2 = 1
+		}
+		left = smartTruncate(left, leftAvail2)
+		pad := leftAvail2 - lipgloss.Width(left)
 		if pad < 1 {
 			pad = 1
 		}
 		row = marker + left + strings.Repeat(" ", pad) + right + " "
 	} else {
-		if lipgloss.Width(left) > leftAvail {
-			left = left[:leftAvail-1] + "…"
-		}
+		left = smartTruncate(left, leftAvail)
 		leftPad := leftAvail - lipgloss.Width(left)
 		if leftPad < 0 {
 			leftPad = 0
@@ -162,6 +165,28 @@ func renderRow(t theme.Theme, s data.Session, width int, selected, fade bool) st
 	default:
 		return row
 	}
+}
+
+// smartTruncate shortens s to maxW visible cells. For path-like strings
+// (containing "/") it keeps the tail visible — e.g.
+// "~/Sites/ven/other/scheduler-invoke-lambda" → "…r-invoke-lambda" — since
+// the trailing folder is the meaningful identifier. Non-path strings get
+// the usual prefix-truncation with ellipsis.
+func smartTruncate(s string, maxW int) string {
+	if maxW <= 0 {
+		return ""
+	}
+	if lipgloss.Width(s) <= maxW {
+		return s
+	}
+	if maxW < 2 {
+		return s[:maxW]
+	}
+	if strings.Contains(s, "/") {
+		// Keep the last (maxW-1) bytes of s + leading ellipsis.
+		return "…" + s[len(s)-maxW+1:]
+	}
+	return s[:maxW-1] + "…"
 }
 
 // formatLastActive renders a session's mtime as a relative string with the
