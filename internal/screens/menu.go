@@ -14,13 +14,6 @@ import (
 	"github.com/rw3iss/claude-viewer/internal/theme"
 )
 
-// usageMsg is delivered when an async usage fetch completes.
-type usageMsg struct {
-	DirPath string
-	Usage   *data.Usage
-	Err     error
-}
-
 // Menu is the paged-by-org main session list.
 type Menu struct {
 	repo    data.Repository
@@ -56,40 +49,13 @@ func NewMenu(repo data.Repository, cfg *config.Config, t theme.Theme, k keys.Map
 	return m
 }
 
-// fetchUsageCmd builds a tea.Cmd that resolves to a usageMsg for one dir.
-func fetchUsageCmd(repo data.Repository, d data.ClaudeDir) tea.Cmd {
-	return func() tea.Msg {
-		u, err := repo.Usage(d)
-		m := usageMsg{DirPath: d.Path, Usage: u}
-		if err != nil {
-			m.Err = err
-		}
-		return m
-	}
-}
-
-// fetchAllUsageCmd batches a fetch for every enabled dir.
-func (m *Menu) fetchAllUsageCmd(forceRefresh bool) tea.Cmd {
+// menuFetchAllUsage batches usage fetches across the menu's enabled dirs.
+// Skipped (returns nil) when the feature is disabled in config.
+func (m *Menu) menuFetchAllUsage(force bool) tea.Cmd {
 	if !m.cfg.ShowUsageMeters {
 		return nil
 	}
-	cmds := make([]tea.Cmd, 0, len(m.dirs))
-	for _, d := range m.dirs {
-		dCopy := d
-		if forceRefresh {
-			cmds = append(cmds, func() tea.Msg {
-				u, err := m.repo.UsageRefresh(dCopy)
-				out := usageMsg{DirPath: dCopy.Path, Usage: u}
-				if err != nil {
-					out.Err = err
-				}
-				return out
-			})
-		} else {
-			cmds = append(cmds, fetchUsageCmd(m.repo, dCopy))
-		}
-	}
-	return tea.Batch(cmds...)
+	return fetchAllUsageCmd(m.repo, m.dirs, force)
 }
 
 func (m *Menu) refresh() {
@@ -112,7 +78,7 @@ func (m *Menu) refresh() {
 }
 
 // Init kicks off async usage fetches when meters are enabled.
-func (m *Menu) Init() tea.Cmd { return m.fetchAllUsageCmd(false) }
+func (m *Menu) Init() tea.Cmd { return m.menuFetchAllUsage(false) }
 
 // SetSize updates dimensions.
 func (m *Menu) SetSize(w, h int) { m.width, m.height = w, h }
@@ -120,7 +86,7 @@ func (m *Menu) SetSize(w, h int) { m.width, m.height = w, h }
 // Update handles input.
 func (m *Menu) Update(msg tea.Msg) (Screen, tea.Cmd) {
 	switch msg := msg.(type) {
-	case usageMsg:
+	case UsageMsg:
 		if msg.Err != nil {
 			m.usageErr[msg.DirPath] = msg.Err.Error()
 		} else {
@@ -192,7 +158,7 @@ func (m *Menu) Update(msg tea.Msg) (Screen, tea.Cmd) {
 				m.refresh()
 				return m, tea.Batch(
 					components.AlertCmd(time.Now().UnixNano(), 2*time.Second),
-					m.fetchAllUsageCmd(true),
+					m.menuFetchAllUsage(true),
 				)
 			}
 		}

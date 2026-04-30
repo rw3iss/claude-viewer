@@ -47,15 +47,34 @@ type AllOrgs struct {
 	colIdx  int              // focused column
 	rowIdx  []int            // selected row per column
 
+	usage    map[string]*data.Usage
+	usageErr map[string]string
+
 	alert       components.Alert
 	helpVisible bool
 }
 
 // NewAllOrgs builds the multi-column screen.
 func NewAllOrgs(repo data.Repository, cfg *config.Config, t theme.Theme, k keys.Map) *AllOrgs {
-	a := &AllOrgs{repo: repo, cfg: cfg, theme: t, keys: k}
+	a := &AllOrgs{
+		repo:     repo,
+		cfg:      cfg,
+		theme:    t,
+		keys:     k,
+		usage:    map[string]*data.Usage{},
+		usageErr: map[string]string{},
+	}
 	a.refresh()
 	return a
+}
+
+// allOrgsFetchUsage batches usage fetches across enabled dirs (skipped when
+// the meters setting is off).
+func (a *AllOrgs) allOrgsFetchUsage(force bool) tea.Cmd {
+	if !a.cfg.ShowUsageMeters {
+		return nil
+	}
+	return fetchAllUsageCmd(a.repo, a.dirs, force)
 }
 
 func (a *AllOrgs) refresh() {
@@ -71,11 +90,19 @@ func (a *AllOrgs) refresh() {
 	}
 }
 
-func (a *AllOrgs) Init() tea.Cmd        { return nil }
-func (a *AllOrgs) SetSize(w, h int)     { a.width, a.height = w, h }
+func (a *AllOrgs) Init() tea.Cmd    { return a.allOrgsFetchUsage(false) }
+func (a *AllOrgs) SetSize(w, h int) { a.width, a.height = w, h }
 
 func (a *AllOrgs) Update(msg tea.Msg) (Screen, tea.Cmd) {
 	switch msg := msg.(type) {
+	case UsageMsg:
+		if msg.Err != nil {
+			a.usageErr[msg.DirPath] = msg.Err.Error()
+		} else {
+			delete(a.usageErr, msg.DirPath)
+			a.usage[msg.DirPath] = msg.Usage
+		}
+		return a, nil
 	case tea.KeyMsg:
 		if a.helpVisible {
 			if key.Matches(msg, a.keys.Help) || key.Matches(msg, a.keys.Esc) {
@@ -120,6 +147,7 @@ func (a *AllOrgs) Update(msg tea.Msg) (Screen, tea.Cmd) {
 			}
 		case key.Matches(msg, a.keys.Reload):
 			a.refresh()
+			return a, a.allOrgsFetchUsage(true)
 		}
 	}
 	return a, nil
@@ -151,6 +179,10 @@ func (a *AllOrgs) View() string {
 		colW = 20
 	}
 	bodyH := a.height - 5
+	// Reserve 3 rows when meters are enabled (2 lines + 1 spacer per column).
+	if a.cfg.ShowUsageMeters {
+		bodyH -= 3
+	}
 	if bodyH < 5 {
 		bodyH = 5
 	}
@@ -172,6 +204,18 @@ func (a *AllOrgs) View() string {
 			}
 			title += "\n" + a.theme.AccentAlt().Render(org)
 		}
+
+		// Optional usage meter centered above the session list.
+		if a.cfg.ShowUsageMeters {
+			var meter string
+			if errMsg, has := a.usageErr[d.Path]; has {
+				meter = components.UsageMeterError(a.theme, errMsg, colW)
+			} else {
+				meter = components.UsageMeter(a.theme, a.usage[d.Path], colW)
+			}
+			title += "\n" + meter
+		}
+
 		cols[i] = components.SessionList(a.theme, components.SessionListInput{
 			Title:       title,
 			Sessions:    a.cols[i],
