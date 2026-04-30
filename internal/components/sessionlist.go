@@ -124,26 +124,27 @@ func renderRow(t theme.Theme, s data.Session, width int, selected, fade bool) st
 	right := s.ShortUUID()
 	la := formatLastActive(s.Mtime)
 
-	// Width budget per row:
-	//   marker(2) + left + pad + lastActive(28) + "  "(2) + uuid + " "(1)
-	leftAvail := width - 2 - lastActiveColWidth - 2 - lipgloss.Width(right) - 1
+	// Width budget per row (no trailing space — joinHorizontal in the
+	// all-orgs view already pads short rows to colW and the divider's
+	// leading space provides visual separation from the uuid).
+	//   marker(2) + left + pad + lastActive(28) + "  "(2) + uuid
+	leftAvail := width - 2 - lastActiveColWidth - 2 - lipgloss.Width(right)
 
 	var row string
 	if leftAvail < 10 {
-		// Terminal too narrow — drop the last-active column. Total row
-		// budget: marker(2) + leftW + pad(>=1) + uuid(8) + trail(1) = width.
-		// → max leftW = width - 12.  Reserve 1 more so the bumped-min
-		// pad doesn't push past width.
-		leftAvail2 := width - 13
+		// Terminal too narrow — drop the last-active column.
+		//   marker(2) + leftW + pad(>=1) + uuid(8) = width
+		//   → leftW + pad = width - 10  → max leftW = width - 11.
+		leftAvail2 := width - 11
 		if leftAvail2 < 1 {
 			leftAvail2 = 1
 		}
 		left = smartTruncate(left, leftAvail2)
-		pad := leftAvail2 - lipgloss.Width(left) + 1 // +1 since leftAvail2 = width-13 not width-12
+		pad := width - 10 - lipgloss.Width(left)
 		if pad < 1 {
 			pad = 1
 		}
-		row = marker + left + strings.Repeat(" ", pad) + right + " "
+		row = marker + left + strings.Repeat(" ", pad) + right
 	} else {
 		left = smartTruncate(left, leftAvail)
 		leftPad := leftAvail - lipgloss.Width(left)
@@ -156,7 +157,7 @@ func renderRow(t theme.Theme, s data.Session, width int, selected, fade bool) st
 		}
 		row = marker + left + strings.Repeat(" ", leftPad) +
 			t.Dim().Render(strings.Repeat(" ", laPad)+la) +
-			"  " + right + " "
+			"  " + right
 	}
 
 	switch {
