@@ -43,6 +43,11 @@ type Config struct {
 	// Layout is the default chat-view layout: "bottom" or "right".
 	Layout string `toml:"layout"`
 
+	// LayoutSwap inverts which pane comes first within the chosen Layout:
+	// in "right" mode, preview goes left of the list; in "bottom" mode,
+	// preview goes above the list.
+	LayoutSwap bool `toml:"layout_swap"`
+
 	// HeaderShow* toggles header widgets.
 	HeaderShowName bool `toml:"header_show_name"`
 	HeaderShowDir  bool `toml:"header_show_dir"`

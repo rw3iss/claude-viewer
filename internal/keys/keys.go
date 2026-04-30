@@ -21,6 +21,7 @@ type Map struct {
 	Copy     key.Binding
 	Save     key.Binding
 	Layout   key.Binding
+	Swap     key.Binding
 	RowsUp   key.Binding
 	RowsDown key.Binding
 	PaneUp   key.Binding
@@ -56,6 +57,7 @@ func Default() Map {
 		Copy:     key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy")),
 		Save:     key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "export")),
 		Layout:   key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "layout")),
+		Swap:     key.NewBinding(key.WithKeys("]"), key.WithHelp("]", "swap panes")),
 		RowsUp:   key.NewBinding(key.WithKeys("ctrl+up"), key.WithHelp("ctrl+↑", "more rows")),
 		RowsDown: key.NewBinding(key.WithKeys("ctrl+down"), key.WithHelp("ctrl+↓", "fewer rows")),
 		PaneUp:   key.NewBinding(key.WithKeys("alt+up"), key.WithHelp("alt+↑", "bigger preview")),

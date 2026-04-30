@@ -61,6 +61,7 @@ type Chat struct {
 	cursor  int
 
 	layout       string // "bottom" | "right"
+	swapped      bool   // invert pane order within the layout
 	previewSize  int    // 30..80
 	previewRows  int    // 1..8 (wrapped lines per prompt in list)
 	searchActive bool
@@ -90,6 +91,7 @@ func NewChat(repo data.Repository, cfg *config.Config, t theme.Theme, k keys.Map
 		session:     s,
 		dir:         d,
 		layout:      cfg.Layout,
+		swapped:     cfg.LayoutSwap,
 		previewSize: cfg.PreviewSize,
 		previewRows: cfg.PreviewRows,
 		searchInput: ti,
@@ -216,9 +218,6 @@ func (c *Chat) Init() tea.Cmd { return waitFsTick(c.watchEvents) }
 func (c *Chat) SetSize(w, h int) {
 	c.width, c.height = w, h
 	c.recomputePanes()
-	// Re-wrap preview content for the new pane width — otherwise the
-	// content keeps the wrap from when the viewport was first sized.
-	c.refreshPreview()
 }
 
 func (c *Chat) recomputePanes() {
@@ -227,6 +226,10 @@ func (c *Chat) recomputePanes() {
 	c.preview.Height = prevH
 	_ = listW
 	_ = listH
+	// Re-wrap preview content for the new pane width — the viewport
+	// stores the pre-wrapped string, so changing Width alone leaves the
+	// previous wrap in place.
+	c.refreshPreview()
 }
 
 func (c *Chat) paneSizes() (listW, listH, prevW, prevH int) {
@@ -360,6 +363,10 @@ func (c *Chat) Update(msg tea.Msg) (Screen, tea.Cmd) {
 			c.cfg.Layout = c.layout
 			_ = config.Save(c.cfg)
 			c.recomputePanes()
+		case key.Matches(msg, c.keys.Swap):
+			c.swapped = !c.swapped
+			c.cfg.LayoutSwap = c.swapped
+			_ = config.Save(c.cfg)
 		case key.Matches(msg, c.keys.PaneUp):
 			if c.previewSize < 80 {
 				c.previewSize += 5
@@ -517,7 +524,7 @@ func (c *Chat) View() string {
 	if c.fullViewActive {
 		return c.renderFullView()
 	}
-	hint := "↑/↓ nav · enter open · f search · c copy · e export · l layout · ctrl+↑/↓ rows · alt+↑/↓ pane · h help · r reload · esc menu"
+	hint := "↑/↓ nav · enter open · f search · c copy · e export · l layout · ] swap · ctrl+↑/↓ rows · alt+↑/↓ pane · h help · r reload · esc menu"
 	header := components.Header(c.theme, *c.cfg, components.HeaderInput{
 		Session: &c.session,
 		Dir:     &c.dir,
@@ -532,11 +539,20 @@ func (c *Chat) View() string {
 	var body string
 	if c.layout == "right" {
 		divider := verticalDivider(c.theme, listH)
-		body = lipgloss.JoinHorizontal(lipgloss.Top, listView, divider, previewView)
+		if c.swapped {
+			body = lipgloss.JoinHorizontal(lipgloss.Top, previewView, divider, listView)
+		} else {
+			body = lipgloss.JoinHorizontal(lipgloss.Top, listView, divider, previewView)
+		}
 	} else {
 		borderW := c.width - 2
 		borderW = max(borderW, 1)
-		body = listView + "\n" + c.theme.Border().Render(strings.Repeat("─", borderW)) + "\n" + previewView
+		hr := c.theme.Border().Render(strings.Repeat("─", borderW))
+		if c.swapped {
+			body = previewView + "\n" + hr + "\n" + listView
+		} else {
+			body = listView + "\n" + hr + "\n" + previewView
+		}
 	}
 
 	// Footer (left-aligned). Search input takes priority, then a transient

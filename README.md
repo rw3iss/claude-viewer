@@ -148,6 +148,7 @@ cv                       # alias for `claude-viewer`
 | `c`            | copy highlighted prompt to clipboard                   |
 | `e`            | export highlighted prompt to `$CWD/claude-prompt-…txt` |
 | `l`            | toggle bottom ↔ right preview layout                   |
+| `]`            | swap pane order (list ↔ preview)                       |
 | `ctrl+↑/↓`     | wrap rows per prompt (1–8)                             |
 | `alt+↑/↓`      | grow/shrink the preview pane                           |
 | `r`            | reload from disk                                       |
@@ -226,6 +227,7 @@ theme         = "default"
 preview_rows  = 2
 preview_size  = 60       # %
 layout        = "bottom"  # or "right"
+layout_swap   = false     # invert pane order within the chosen layout
 
 # Dirs the user explicitly hid (overrides auto-detect):
 disabled = []
