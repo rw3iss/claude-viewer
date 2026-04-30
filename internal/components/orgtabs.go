@@ -30,9 +30,9 @@ func OrgTabsWithWidths(t theme.Theme, in OrgTabsInput) (string, []int) {
 		return "", nil
 	}
 
-	// First pass: compute wrapped org lines per tab + max line count so
-	// every tab gets the same vertical space (shorter orgs get top-padded
-	// with an empty line).
+	// First pass: wrap org names + pad shorter ones at the bottom so all
+	// tabs share the same vertical extent. Top-aligned now: label sits
+	// on row 0 across every tab, org wraps grow downward.
 	orgLinesByTab := make([][]string, len(in.Dirs))
 	maxOrgLines := 1
 	for i, d := range in.Dirs {
@@ -43,7 +43,7 @@ func OrgTabsWithWidths(t theme.Theme, in OrgTabsInput) (string, []int) {
 	}
 	for i := range orgLinesByTab {
 		for len(orgLinesByTab[i]) < maxOrgLines {
-			orgLinesByTab[i] = append([]string{""}, orgLinesByTab[i]...)
+			orgLinesByTab[i] = append(orgLinesByTab[i], "")
 		}
 	}
 
@@ -65,7 +65,7 @@ func OrgTabsWithWidths(t theme.Theme, in OrgTabsInput) (string, []int) {
 		}
 		parts = append(parts, tab)
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Bottom, parts...), widths
+	return lipgloss.JoinHorizontal(lipgloss.Top, parts...), widths
 }
 
 // orgNameMaxLineWidth caps how wide a single org-name line can be — beyond
@@ -138,32 +138,23 @@ func JoinTabRow(parts []string) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, out...)
 }
 
-// renderOrgTab returns the tab block (one or more org lines + bordered box)
-// and its block width — the max of all org-line widths and box width.
-// Every line is centered within that block so the column is uniform.
+// renderOrgTab returns a flat top-aligned tab block (label on top, org name
+// wrapping below) plus its visible block width. No border box — selection
+// is communicated via bold accent color on the label. Every line is centered
+// within blockW so columns line up neatly.
 //
-// orgLines is a pre-wrapped, top-padded slice from OrgTabsWithWidths so all
-// tabs in the strip share the same height regardless of org-name length.
+// orgLines is a pre-wrapped, bottom-padded slice from OrgTabsWithWidths so
+// all tabs share the same vertical extent regardless of org-name length.
 func renderOrgTab(t theme.Theme, d data.ClaudeDir, selected bool, orgLines []string) (string, int) {
-	labelText := " " + d.Label + " "
+	label := d.Label
 	if d.Custom {
-		labelText = " " + d.Label + " ★"
+		label += " ★"
 	}
-
-	var box string
+	var labelStyled string
 	if selected {
-		box = lipgloss.NewStyle().
-			Border(lipgloss.ThickBorder()).
-			BorderForeground(lipgloss.Color("#56b6c2")).
-			Foreground(lipgloss.Color("#ffffff")).
-			Bold(true).
-			Render(labelText)
+		labelStyled = t.Accent().Bold(true).Render(label)
 	} else {
-		box = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#555")).
-			Foreground(lipgloss.Color("#aaaaaa")).
-			Render(labelText)
+		labelStyled = t.Subtitle().Render(label)
 	}
 
 	// Style each org line.
@@ -184,19 +175,18 @@ func renderOrgTab(t theme.Theme, d data.ClaudeDir, selected bool, orgLines []str
 		}
 	}
 
-	boxW := lipgloss.Width(box)
-	blockW := boxW
+	labelW := lipgloss.Width(labelStyled)
+	blockW := labelW
 	if maxOrgW > blockW {
 		blockW = maxOrgW
 	}
 
-	// Center every org line and the box within blockW.
 	center := lipgloss.NewStyle().Width(blockW).Align(lipgloss.Center)
 	var b strings.Builder
+	b.WriteString(center.Render(labelStyled))
 	for _, l := range styled {
-		b.WriteString(center.Render(l))
 		b.WriteString("\n")
+		b.WriteString(center.Render(l))
 	}
-	b.WriteString(center.Render(box))
 	return b.String(), blockW
 }
