@@ -130,14 +130,16 @@ func renderRow(t theme.Theme, s data.Session, width int, selected, fade bool) st
 
 	var row string
 	if leftAvail < 10 {
-		// Terminal too narrow — drop the last-active column. Still need
-		// to truncate `left` so the row fits in `width`.
-		leftAvail2 := width - 2 - lipgloss.Width(right) - 2
+		// Terminal too narrow — drop the last-active column. Total row
+		// budget: marker(2) + leftW + pad(>=1) + uuid(8) + trail(1) = width.
+		// → max leftW = width - 12.  Reserve 1 more so the bumped-min
+		// pad doesn't push past width.
+		leftAvail2 := width - 13
 		if leftAvail2 < 1 {
 			leftAvail2 = 1
 		}
 		left = smartTruncate(left, leftAvail2)
-		pad := leftAvail2 - lipgloss.Width(left)
+		pad := leftAvail2 - lipgloss.Width(left) + 1 // +1 since leftAvail2 = width-13 not width-12
 		if pad < 1 {
 			pad = 1
 		}
