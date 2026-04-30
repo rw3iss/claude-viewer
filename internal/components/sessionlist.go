@@ -1,6 +1,7 @@
 package components
 
 import (
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,11 +32,10 @@ func SessionList(t theme.Theme, in SessionListInput) string {
 	}
 	var b strings.Builder
 	if in.Title != "" {
-		titleStyle := t.Subtitle()
-		if in.IsFocused {
-			titleStyle = titleStyle.Bold(true)
-		}
-		b.WriteString(titleStyle.Render(in.Title))
+		// Title is rendered as-is so callers can pre-style multiple parts
+		// (label, subtitle, etc) and we don't risk overflowing colW with
+		// auto-styling that hides truncation.
+		b.WriteString(in.Title)
 		b.WriteString("\n")
 	}
 
@@ -103,6 +103,10 @@ func SessionList(t theme.Theme, in SessionListInput) string {
 	return b.String()
 }
 
+// lastActiveColWidth is the fixed reservation for the "- 7h 12m ago (Apr 2 14:23)"
+// column. Sized to fit the worst case ("- 99d 23h ago (Jan 22 23:59)" ≈ 28 cols).
+const lastActiveColWidth = 28
+
 func renderRow(t theme.Theme, s data.Session, width int, selected, fade bool) string {
 	// Leading marker column: green ● when a live process holds the file
 	// open, two spaces otherwise. Always 2 cells wide so columns align.
@@ -116,11 +120,37 @@ func renderRow(t theme.Theme, s data.Session, width int, selected, fade bool) st
 		left = s.CustomName
 	}
 	right := s.ShortUUID()
-	pad := width - 2 - lipgloss.Width(left) - lipgloss.Width(right) - 2
-	if pad < 1 {
-		pad = 1
+	la := formatLastActive(s.Mtime)
+
+	// Width budget per row:
+	//   marker(2) + left + pad + lastActive(28) + "  "(2) + uuid + " "(1)
+	leftAvail := width - 2 - lastActiveColWidth - 2 - lipgloss.Width(right) - 1
+
+	var row string
+	if leftAvail < 10 {
+		// Terminal too narrow — drop the last-active column to keep the
+		// name + uuid readable.
+		pad := width - 2 - lipgloss.Width(left) - lipgloss.Width(right) - 2
+		if pad < 1 {
+			pad = 1
+		}
+		row = marker + left + strings.Repeat(" ", pad) + right + " "
+	} else {
+		if lipgloss.Width(left) > leftAvail {
+			left = left[:leftAvail-1] + "…"
+		}
+		leftPad := leftAvail - lipgloss.Width(left)
+		if leftPad < 0 {
+			leftPad = 0
+		}
+		laPad := lastActiveColWidth - lipgloss.Width(la)
+		if laPad < 0 {
+			laPad = 0
+		}
+		row = marker + left + strings.Repeat(" ", leftPad) +
+			t.Dim().Render(strings.Repeat(" ", laPad)+la) +
+			"  " + right + " "
 	}
-	row := marker + left + strings.Repeat(" ", pad) + right + " "
 
 	switch {
 	case selected:
@@ -130,4 +160,50 @@ func renderRow(t theme.Theme, s data.Session, width int, selected, fade bool) st
 	default:
 		return row
 	}
+}
+
+// formatLastActive renders a session's mtime as a relative string with the
+// absolute timestamp in parens, e.g. "- 7h 12m ago (Apr 29 18:30)".
+func formatLastActive(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return "- " + relativeAgo(t) + " (" + t.Format("Jan 2 15:04") + ")"
+}
+
+func relativeAgo(t time.Time) string {
+	d := time.Since(t)
+	if d < 0 {
+		d = 0
+	}
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return formatRelMinutes(int(d.Minutes()))
+	case d < 24*time.Hour:
+		h := int(d.Hours())
+		m := int(d.Minutes()) - h*60
+		if m == 0 {
+			return formatRelHours(h)
+		}
+		return formatRelHours(h) + " " + formatRelMinutes(m)
+	default:
+		days := int(d.Hours()) / 24
+		h := int(d.Hours()) - days*24
+		if h == 0 {
+			return formatRelDays(days)
+		}
+		return formatRelDays(days) + " " + formatRelHours(h)
+	}
+}
+
+func formatRelMinutes(m int) string { return fmtItoa(m) + "m ago" }
+func formatRelHours(h int) string   { return fmtItoa(h) + "h" }
+func formatRelDays(d int) string    { return fmtItoa(d) + "d" }
+func fmtItoa(n int) string {
+	if n < 0 {
+		n = 0
+	}
+	return strconv.Itoa(n)
 }

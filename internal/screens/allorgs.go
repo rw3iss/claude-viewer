@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/rw3iss/claude-viewer/internal/events"
 	"github.com/rw3iss/claude-viewer/internal/components"
 	"github.com/rw3iss/claude-viewer/internal/config"
@@ -12,6 +13,25 @@ import (
 	"github.com/rw3iss/claude-viewer/internal/keys"
 	"github.com/rw3iss/claude-viewer/internal/theme"
 )
+
+// truncateAnsi truncates a possibly-styled string to at most maxW visible
+// cells, appending an ellipsis if it had to cut. lipgloss.Width handles the
+// ANSI-aware width calc; the slice is byte-based, so we re-style as needed.
+func truncateAnsi(s string, maxW int) string {
+	if lipgloss.Width(s) <= maxW {
+		return s
+	}
+	// Naive: lop off bytes until visible width fits. Works for our case
+	// because labels (.claude, .claude-2, .claude-work) are ASCII; ANSI
+	// escapes are at the start/end so trimming from the end is safe.
+	for i := len(s); i > 0; i-- {
+		cand := s[:i]
+		if lipgloss.Width(cand) <= maxW-1 {
+			return cand + "…"
+		}
+	}
+	return ""
+}
 
 // AllOrgs renders every enabled ClaudeDir as a column on one screen.
 type AllOrgs struct {
@@ -69,6 +89,9 @@ func (a *AllOrgs) Update(msg tea.Msg) (Screen, tea.Cmd) {
 			return a, nil
 		case key.Matches(msg, a.keys.Esc):
 			return a, func() tea.Msg { return events.SwitchScreenMsg{To: events.ScreenMenu} }
+		case key.Matches(msg, a.keys.AllOrgs):
+			// 'a' toggles back to the regular per-org menu.
+			return a, func() tea.Msg { return events.SwitchScreenMsg{To: events.ScreenMenu} }
 		case key.Matches(msg, a.keys.Quit):
 			return a, func() tea.Msg { return events.QuitAppMsg{} }
 		case key.Matches(msg, a.keys.Left):
@@ -113,7 +136,7 @@ func (a *AllOrgs) View() string {
 			Width:    a.width, Height: a.height,
 		})
 	}
-	hint := "←/→ column · ↑/↓ row · enter open · h help · esc back · ctrl+r reload"
+	hint := "←/→ column · ↑/↓ row · enter open · a / esc back · h help · ctrl+r reload"
 	header := components.Header(a.theme, *a.cfg, components.HeaderInput{
 		Title:   "All Organizations",
 		HintRow: hint,
@@ -134,9 +157,20 @@ func (a *AllOrgs) View() string {
 
 	cols := make([]string, len(a.dirs))
 	for i, d := range a.dirs {
-		title := d.Label
+		// Build a styled, colW-truncated 1- or 2-line header so each
+		// column's widest line stays at colW — otherwise JoinHorizontal
+		// pads the column to the title's width and breaks alignment.
+		labelStyle := a.theme.Subtitle()
+		if i == a.colIdx {
+			labelStyle = labelStyle.Bold(true)
+		}
+		title := truncateAnsi(labelStyle.Render(d.Label), colW)
 		if d.OrgName != "" {
-			title += "  " + a.theme.AccentAlt().Render("@ "+d.OrgName)
+			org := "@ " + d.OrgName
+			if lipgloss.Width(org) > colW {
+				org = org[:colW-1] + "…"
+			}
+			title += "\n" + a.theme.AccentAlt().Render(org)
 		}
 		cols[i] = components.SessionList(a.theme, components.SessionListInput{
 			Title:       title,
