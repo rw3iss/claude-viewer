@@ -179,13 +179,16 @@ func parseTime(s string) (time.Time, bool) {
 
 var (
 	// tagBlock = wholesale-strip these blocks (Claude Code system-emitted
-	// metadata that the user never wrote and shouldn't see).
-	tagBlock = regexp.MustCompile(`(?s)<(system-reminder|local-command-stdout|local-command-stderr|local-command-caveat)>.*?</[^>]+>`)
+	// metadata that the user never wrote and shouldn't see). Includes
+	// <command-message> because it's redundant with <command-name>
+	// (just the command name minus the leading slash).
+	tagBlock = regexp.MustCompile(`(?s)<(system-reminder|local-command-stdout|local-command-stderr|local-command-caveat|command-message)>.*?</[^>]+>`)
 
-	// commandTag = unwrap these to their inner text (the user typed a
-	// slash-command; Claude Code wraps the parts as XML, but the message
-	// the user actually sent is the concatenated inner text).
-	commandTag = regexp.MustCompile(`<(command-message|command-name|command-args|command-stdout|command-stderr)>([^<]*)</[^>]+>`)
+	// commandTag = unwrap these to their inner text. <command-name> keeps
+	// its leading slash; <command-args> carries any arguments; the
+	// surrounding free-form text is the body the user sent along with
+	// the command.
+	commandTag = regexp.MustCompile(`<(command-name|command-args|command-stdout|command-stderr)>([^<]*)</[^>]+>`)
 
 	multiNL = regexp.MustCompile(`\n+`)
 	multiWS = regexp.MustCompile(`\s+`)
