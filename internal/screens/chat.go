@@ -198,6 +198,9 @@ func (c *Chat) Init() tea.Cmd { return waitFsTick(c.watchEvents) }
 func (c *Chat) SetSize(w, h int) {
 	c.width, c.height = w, h
 	c.recomputePanes()
+	// Re-wrap preview content for the new pane width — otherwise the
+	// content keeps the wrap from when the viewport was first sized.
+	c.refreshPreview()
 }
 
 func (c *Chat) recomputePanes() {
@@ -433,7 +436,7 @@ func (c *Chat) renderList(w, h int) string {
 	if len(filtered) == 0 {
 		return c.theme.Dim().Render("(no prompts)")
 	}
-	prefixW := 18 // "HH:MM:SS  TOOK  "
+	prefixW := 19 // "HH:MM:SS  " (10) + "%-7s  " (9)
 	textW := w - prefixW
 	if textW < 20 {
 		textW = 20
@@ -476,7 +479,9 @@ func (c *Chat) renderList(w, h int) string {
 		rendered = append(rendered, "")
 		if i == cursorAdj {
 			cursorBlockIdx = len(blocks)
-			rendered[firstMsgIdx] = c.theme.Selected().Render(rendered[firstMsgIdx])
+			// Constrain the highlighted row to the list-pane width so
+			// the BG color doesn't bleed into the preview pane on the right.
+			rendered[firstMsgIdx] = c.theme.Selected().Width(w).Render(rendered[firstMsgIdx])
 		}
 		blocks = append(blocks, block{lines: rendered, isCursor: i == cursorAdj})
 	}
