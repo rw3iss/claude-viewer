@@ -235,7 +235,7 @@ func (s *Settings) Update(msg tea.Msg) (Screen, tea.Cmd) {
 
 func (s *Settings) View() string {
 	if s.width < 20 || s.height < 8 {
-		return s.theme.Dim().Render("claude-viewer: initializing…")
+		return components.LoadingPlaceholder(s.theme)
 	}
 	if s.helpVisible {
 		return components.RenderHelp(s.theme, components.HelpInput{

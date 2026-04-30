@@ -64,4 +64,16 @@ func (defaultTheme) AlertErr() lipgloss.Style {
 		Padding(0, 1)
 }
 
+func (defaultTheme) BorderSubtle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#666666"))
+}
+
+func (defaultTheme) BarHot() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#ffb055"))
+}
+
+func (defaultTheme) BarWarn() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#e5c07b"))
+}
+
 func init() { Register(defaultTheme{}) }

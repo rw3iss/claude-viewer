@@ -134,9 +134,7 @@ func (m *Model) View() string {
 		lines[lastIdx] = last + strings.Repeat(" ", pad) + memText
 	} else {
 		pad := m.width - memW
-		if pad < 0 {
-			pad = 0
-		}
+		pad = max(pad, 0)
 		lines = append(lines, strings.Repeat(" ", pad)+memText)
 	}
 	return strings.Join(lines, "\n")

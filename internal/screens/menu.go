@@ -169,7 +169,7 @@ func (m *Menu) Update(msg tea.Msg) (Screen, tea.Cmd) {
 // View renders the screen.
 func (m *Menu) View() string {
 	if m.width < 20 || m.height < 8 {
-		return m.theme.Dim().Render("claude-viewer: initializing…")
+		return components.LoadingPlaceholder(m.theme)
 	}
 	if m.helpVisible {
 		return components.RenderHelp(m.theme, components.HelpInput{
@@ -220,9 +220,7 @@ func (m *Menu) View() string {
 	if meterRow != "" {
 		bodyHeight -= lipgloss.Height(meterRow)
 	}
-	if bodyHeight < 5 {
-		bodyHeight = 5
-	}
+	bodyHeight = max(bodyHeight, 5)
 
 	body := components.SessionList(m.theme, components.SessionListInput{
 		Sessions:    m.sessions,

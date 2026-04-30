@@ -89,12 +89,8 @@ func stripErrPrefix(s string) string {
 // countdown to the period reset (or "5h"/"7d" if not yet known); the
 // bar takes whatever cells remain after label and percentage.
 func meterLine(t theme.Theme, label string, pct int, totalW int) string {
-	if pct < 0 {
-		pct = 0
-	}
-	if pct > 999 {
-		pct = 999
-	}
+	pct = max(pct, 0)
+	pct = min(pct, 999)
 	pctStr := fmt.Sprintf("%d%%", pct)
 	full := len(label) + 1 + 1 + 1 + len(pctStr)   // label + space + bar(>=1) + space + pct
 	narrow := len(label) + 1 + len(pctStr)         // text-only fallback
@@ -114,16 +110,10 @@ func meterLine(t theme.Theme, label string, pct int, totalW int) string {
 }
 
 func buildBar(t theme.Theme, pct, w int) string {
-	if w < 1 {
-		w = 1
-	}
+	w = max(w, 1)
 	filled := pct * w / 100
-	if filled > w {
-		filled = w
-	}
-	if filled < 0 {
-		filled = 0
-	}
+	filled = min(filled, w)
+	filled = max(filled, 0)
 	left := strings.Repeat("█", filled)
 	right := strings.Repeat("░", w-filled)
 	style := t.Success()
@@ -131,9 +121,9 @@ func buildBar(t theme.Theme, pct, w int) string {
 	case pct >= 90:
 		style = t.Error()
 	case pct >= 70:
-		style = lipgloss.NewStyle().Foreground(lipgloss.Color("#e5c07b"))
+		style = t.BarWarn()
 	case pct >= 50:
-		style = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffb055"))
+		style = t.BarHot()
 	}
 	return style.Render(left) + t.Dim().Render(right)
 }

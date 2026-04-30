@@ -110,9 +110,7 @@ func (c *Chat) refreshPreview() {
 	p := c.filteredPrompts()[c.cursor]
 
 	wrapW := c.preview.Width - 4
-	if wrapW < 20 {
-		wrapW = 20
-	}
+	wrapW = max(wrapW, 20)
 	wrapStyle := lipgloss.NewStyle().Width(wrapW)
 
 	var b strings.Builder
@@ -213,9 +211,7 @@ func (c *Chat) recomputePanes() {
 
 func (c *Chat) paneSizes() (listW, listH, prevW, prevH int) {
 	bodyH := c.height - 5
-	if bodyH < 5 {
-		bodyH = 5
-	}
+	bodyH = max(bodyH, 5)
 	if c.layout == "right" {
 		prevW = c.width * c.previewSize / 100
 		listW = c.width - prevW - 1
@@ -298,15 +294,11 @@ func (c *Chat) Update(msg tea.Msg) (Screen, tea.Cmd) {
 			c.refreshPreview()
 		case key.Matches(msg, c.keys.End):
 			c.cursor = len(filtered) - 1
-			if c.cursor < 0 {
-				c.cursor = 0
-			}
+			c.cursor = max(c.cursor, 0)
 			c.refreshPreview()
 		case key.Matches(msg, c.keys.PageUp):
 			c.cursor -= 10
-			if c.cursor < 0 {
-				c.cursor = 0
-			}
+			c.cursor = max(c.cursor, 0)
 			c.refreshPreview()
 		case key.Matches(msg, c.keys.PageDown):
 			c.cursor += 10
@@ -389,7 +381,7 @@ func (c *Chat) View() string {
 	// Pre-WindowSizeMsg or absurdly small terminal — show a placeholder
 	// rather than running geometry math with negative numbers.
 	if c.width < 20 || c.height < 8 {
-		return c.theme.Dim().Render("claude-viewer: initializing…")
+		return components.LoadingPlaceholder(c.theme)
 	}
 	if c.helpVisible {
 		return components.RenderHelp(c.theme, components.HelpInput{
@@ -416,9 +408,7 @@ func (c *Chat) View() string {
 		body = lipgloss.JoinHorizontal(lipgloss.Top, listView, c.theme.Border().Render("│"), previewView)
 	} else {
 		borderW := c.width - 2
-		if borderW < 1 {
-			borderW = 1
-		}
+		borderW = max(borderW, 1)
 		body = listView + "\n" + c.theme.Border().Render(strings.Repeat("─", borderW)) + "\n" + previewView
 	}
 
@@ -438,9 +428,7 @@ func (c *Chat) renderList(w, h int) string {
 	}
 	prefixW := 19 // "HH:MM:SS  " (10) + "%-7s  " (9)
 	textW := w - prefixW
-	if textW < 20 {
-		textW = 20
-	}
+	textW = max(textW, 20)
 	var lines []string
 	rowsUsed := 0
 	lastDate := ""
@@ -512,12 +500,12 @@ func (c *Chat) renderPreview(w, h int) string {
 	return box.Render(c.preview.View())
 }
 
-func wrapText(text string, w, max int) []string {
+func wrapText(text string, w, maxLines int) []string {
 	if w < 10 {
 		w = 10
 	}
 	var out []string
-	for len(text) > 0 && len(out) < max {
+	for len(text) > 0 && len(out) < maxLines {
 		if len(text) <= w {
 			out = append(out, text)
 			text = ""

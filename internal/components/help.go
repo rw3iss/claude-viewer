@@ -62,7 +62,7 @@ func RenderHelp(t theme.Theme, in HelpInput) string {
 
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#666")).
+		BorderForeground(t.BorderSubtle().GetForeground()).
 		Padding(1, 2)
 	titleLine := t.Title().Render(in.Title)
 	rendered := box.Render(titleLine + "\n\n" + body.String())

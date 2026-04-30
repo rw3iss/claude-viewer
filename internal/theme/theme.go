@@ -28,6 +28,15 @@ type Theme interface {
 	AlertOK() lipgloss.Style
 	AlertWarn() lipgloss.Style
 	AlertErr() lipgloss.Style
+
+	// Borders for free-floating UI (modals, help overlay).
+	BorderSubtle() lipgloss.Style
+
+	// Bar styles for progress / utilization bars at increasing percentages.
+	// Lipgloss styles for the bar's "filled" portion (the empty portion
+	// always uses Dim()). Pick one based on pct: see DefaultBarColor below.
+	BarHot() lipgloss.Style  // 50–69%
+	BarWarn() lipgloss.Style // 70–89%
 }
 
 var registry = map[string]Theme{}

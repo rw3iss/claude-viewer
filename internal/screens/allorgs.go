@@ -155,7 +155,7 @@ func (a *AllOrgs) Update(msg tea.Msg) (Screen, tea.Cmd) {
 
 func (a *AllOrgs) View() string {
 	if a.width < 20 || a.height < 8 {
-		return a.theme.Dim().Render("claude-viewer: initializing…")
+		return components.LoadingPlaceholder(a.theme)
 	}
 	if a.helpVisible {
 		return components.RenderHelp(a.theme, components.HelpInput{
@@ -175,17 +175,13 @@ func (a *AllOrgs) View() string {
 	}
 
 	colW := (a.width - len(a.dirs) - 1) / len(a.dirs)
-	if colW < 20 {
-		colW = 20
-	}
+	colW = max(colW, 20)
 	bodyH := a.height - 5
 	// Reserve 3 rows when meters are enabled (2 lines + 1 spacer per column).
 	if a.cfg.ShowUsageMeters {
 		bodyH -= 3
 	}
-	if bodyH < 5 {
-		bodyH = 5
-	}
+	bodyH = max(bodyH, 5)
 
 	cols := make([]string, len(a.dirs))
 	for i, d := range a.dirs {

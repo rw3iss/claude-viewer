@@ -12,6 +12,13 @@ import (
 	"github.com/rw3iss/claude-viewer/internal/theme"
 )
 
+// LoadingPlaceholder returns the "initializing…" line every screen renders
+// during the brief window between construction and the first WindowSizeMsg
+// (when width/height are still zero or impractically small).
+func LoadingPlaceholder(t theme.Theme) string {
+	return t.Dim().Render("claude-viewer: initializing…")
+}
+
 // HeaderInput is everything the header may want to display.
 type HeaderInput struct {
 	Title   string // primary screen title (optional, for menu/settings)
@@ -27,13 +34,9 @@ func Header(t theme.Theme, cfg config.Config, in HeaderInput) string {
 	right := buildRight(t, cfg, in)
 
 	w := in.Width
-	if w < 20 {
-		w = 20
-	}
+	w = max(w, 20)
 	pad := w - lipgloss.Width(left) - lipgloss.Width(right)
-	if pad < 2 {
-		pad = 2
-	}
+	pad = max(pad, 2)
 
 	line1 := left + strings.Repeat(" ", pad) + right
 	if in.HintRow == "" {

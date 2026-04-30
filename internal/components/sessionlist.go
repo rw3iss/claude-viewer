@@ -27,9 +27,7 @@ type SessionListInput struct {
 // appear at the top with a green ● marker. Everything else follows below a
 // divider, dimmed if the mtime is older than ActiveTTL.
 func SessionList(t theme.Theme, in SessionListInput) string {
-	if in.Width < 10 {
-		in.Width = 10
-	}
+	in.Width = max(in.Width, 10)
 	var b strings.Builder
 	if in.Title != "" {
 		// Title is rendered as-is so callers can pre-style multiple parts
@@ -40,9 +38,7 @@ func SessionList(t theme.Theme, in SessionListInput) string {
 	}
 
 	visible := in.Height - 2
-	if visible < 1 {
-		visible = 1
-	}
+	visible = max(visible, 1)
 	if len(in.Sessions) == 0 {
 		b.WriteString(t.Dim().Render("(no sessions)"))
 		return b.String()
@@ -79,9 +75,7 @@ func SessionList(t theme.Theme, in SessionListInput) string {
 	}
 	if len(running) > 0 && len(rest) > 0 {
 		bw := in.Width - 2
-		if bw < 1 {
-			bw = 1
-		}
+		bw = max(bw, 1)
 		rows = append(rows, t.Border().Render(strings.Repeat("─", bw)))
 	}
 	for _, e := range rest {
@@ -94,13 +88,9 @@ func SessionList(t theme.Theme, in SessionListInput) string {
 	if in.SelectedIdx >= visible {
 		start = in.SelectedIdx - visible + 1
 	}
-	if start < 0 {
-		start = 0
-	}
+	start = max(start, 0)
 	end := start + visible
-	if end > len(rows) {
-		end = len(rows)
-	}
+	end = min(end, len(rows))
 	b.WriteString(strings.Join(rows[start:end], "\n"))
 	return b.String()
 }
@@ -136,25 +126,17 @@ func renderRow(t theme.Theme, s data.Session, width int, selected, fade bool) st
 		//   marker(2) + leftW + pad(>=1) + uuid(8) = width
 		//   → leftW + pad = width - 10  → max leftW = width - 11.
 		leftAvail2 := width - 11
-		if leftAvail2 < 1 {
-			leftAvail2 = 1
-		}
+		leftAvail2 = max(leftAvail2, 1)
 		left = smartTruncate(left, leftAvail2)
 		pad := width - 10 - lipgloss.Width(left)
-		if pad < 1 {
-			pad = 1
-		}
+		pad = max(pad, 1)
 		row = marker + left + strings.Repeat(" ", pad) + right
 	} else {
 		left = smartTruncate(left, leftAvail)
 		leftPad := leftAvail - lipgloss.Width(left)
-		if leftPad < 0 {
-			leftPad = 0
-		}
+		leftPad = max(leftPad, 0)
 		laPad := lastActiveColWidth - lipgloss.Width(la)
-		if laPad < 0 {
-			laPad = 0
-		}
+		laPad = max(laPad, 0)
 		row = marker + left + strings.Repeat(" ", leftPad) +
 			t.Dim().Render(strings.Repeat(" ", laPad)+la) +
 			"  " + right
@@ -203,9 +185,7 @@ func formatLastActive(t time.Time) string {
 
 func relativeAgo(t time.Time) string {
 	d := time.Since(t)
-	if d < 0 {
-		d = 0
-	}
+	d = max(d, 0)
 	switch {
 	case d < time.Minute:
 		return "just now"
@@ -232,8 +212,6 @@ func formatRelMinutes(m int) string { return fmtItoa(m) + "m ago" }
 func formatRelHours(h int) string   { return fmtItoa(h) + "h" }
 func formatRelDays(d int) string    { return fmtItoa(d) + "d" }
 func fmtItoa(n int) string {
-	if n < 0 {
-		n = 0
-	}
+	n = max(n, 0)
 	return strconv.Itoa(n)
 }
