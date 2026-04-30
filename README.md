@@ -21,6 +21,20 @@ session when you launch from inside a project directory.
       <sub><b>Settings</b> — toggle/disable any <code>~/.claude*</code> dir, add custom dirs, edit preferences (active-session window, usage meters).</sub>
     </td>
   </tr>
+  <tr>
+    <td width="50%" align="center">
+      <a href=".github/screenshot_session_vertical.png">
+        <img src=".github/screenshot_session_vertical.png" alt="Session chat — vertical layout (preview below)" />
+      </a><br/>
+      <sub><b>Session chat — vertical layout</b> — prompt list on top, full prompt content wrapped below. Toggle with <code>ctrl+l</code>.</sub>
+    </td>
+    <td width="50%" align="center">
+      <a href=".github/screenshot_session_horizontal.png">
+        <img src=".github/screenshot_session_horizontal.png" alt="Session chat — horizontal layout (preview on right)" />
+      </a><br/>
+      <sub><b>Session chat — horizontal layout</b> — prompt list on the left, preview pane on the right. Resize with <code>alt+↑/↓</code>.</sub>
+    </td>
+  </tr>
 </table>
 
 ## Install
