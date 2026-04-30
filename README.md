@@ -1,10 +1,26 @@
 # claude-viewer
 
-A fast, multi-org TUI browser for Claude Code session history.
+A fast, multi-org TUI browser for Claude Code session history — with
+**live updates**.
 
 Auto-detects every `~/.claude*` config dir on your machine, lets you page
 through their sessions across orgs, and drops you straight into the right
 session when you launch from inside a project directory.
+
+**Live-viewing**: every chat session you open is watched via `fsnotify`, so
+new prompts and responses appear in the list as Claude writes them — no
+key press needed. The main menu shows actually-running sessions (a live
+process holds the JSONL open) with a green ●&nbsp;at the top of each org's
+list, so you can see at a glance which agents are working *right now*
+across every account. Optional 5h/7d usage meters under each org tab
+update on reload (`ctrl+r`) so you know how much rate-limit budget each
+account has left. Open prompts show per-turn **token usage** (input,
+output, cache hits) and time-to-first-response.
+
+It's effectively a multi-window dashboard for everything Claude is doing
+on your machine — useful when you have several sessions running in
+different terminals, or different accounts, and want to keep tabs on all
+of them from one place.
 
 <table>
   <tr>

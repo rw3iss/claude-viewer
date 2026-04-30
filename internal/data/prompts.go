@@ -10,13 +10,27 @@ import (
 	"time"
 )
 
-// Prompt is one user prompt + its time-to-first-response.
+// Prompt is one user prompt + its time-to-first-response + token usage of
+// the assistant reply (sum across all iterations).
 type Prompt struct {
-	Time      time.Time
-	Text      string // cleaned single-line for list display
-	FullText  string // original with newlines preserved (for preview)
-	Took      time.Duration
-	Pending   bool // no assistant response yet
+	Time     time.Time
+	Text     string // cleaned single-line for list display
+	FullText string // original with newlines preserved (for preview)
+	Took     time.Duration
+	Pending  bool // no assistant response yet
+
+	// Token usage of the assistant turn following this prompt. Zeros when
+	// Pending or when the JSONL didn't carry a usage block.
+	InputTokens         int
+	OutputTokens        int
+	CacheReadTokens     int
+	CacheCreationTokens int
+	Model               string
+}
+
+// TotalInputTokens sums fresh + cache-read + cache-creation input.
+func (p Prompt) TotalInputTokens() int {
+	return p.InputTokens + p.CacheReadTokens + p.CacheCreationTokens
 }
 
 // LoadPrompts parses a JSONL session file and pairs user prompts with the
@@ -35,6 +49,16 @@ func LoadPrompts(path string) ([]Prompt, error) {
 	}
 	type userMessage struct {
 		Content json.RawMessage `json:"content"`
+	}
+	type usage struct {
+		InputTokens              int `json:"input_tokens"`
+		OutputTokens             int `json:"output_tokens"`
+		CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+		CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+	}
+	type assistantMessage struct {
+		Model string `json:"model"`
+		Usage usage  `json:"usage"`
 	}
 
 	var prompts []Prompt
@@ -85,11 +109,37 @@ func LoadPrompts(path string) ([]Prompt, error) {
 					pend = &pending{ts: ts, text: cleaned, full: full}
 				case "assistant":
 					if pend != nil {
-						prompts = append(prompts, Prompt{
+						p := Prompt{
 							Time: pend.ts, Text: pend.text, FullText: pend.full,
 							Took: ts.Sub(pend.ts),
-						})
+						}
+						if e.Message != nil {
+							var am assistantMessage
+							if jerr := json.Unmarshal(e.Message, &am); jerr == nil {
+								p.Model = am.Model
+								p.InputTokens = am.Usage.InputTokens
+								p.OutputTokens = am.Usage.OutputTokens
+								p.CacheReadTokens = am.Usage.CacheReadInputTokens
+								p.CacheCreationTokens = am.Usage.CacheCreationInputTokens
+							}
+						}
+						prompts = append(prompts, p)
 						pend = nil
+					} else if len(prompts) > 0 && e.Message != nil {
+						// Continuation of the previous turn (multi-message
+						// reply, e.g. tool use → result → final text).
+						// Sum its tokens onto the existing Prompt.
+						var am assistantMessage
+						if jerr := json.Unmarshal(e.Message, &am); jerr == nil {
+							last := &prompts[len(prompts)-1]
+							last.InputTokens += am.Usage.InputTokens
+							last.OutputTokens += am.Usage.OutputTokens
+							last.CacheReadTokens += am.Usage.CacheReadInputTokens
+							last.CacheCreationTokens += am.Usage.CacheCreationInputTokens
+							if last.Model == "" {
+								last.Model = am.Model
+							}
+						}
 					}
 				}
 			}

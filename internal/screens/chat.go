@@ -109,9 +109,6 @@ func (c *Chat) refreshPreview() {
 	}
 	p := c.filteredPrompts()[c.cursor]
 
-	// viewport.Model doesn't word-wrap, so pre-wrap each line to the
-	// preview pane width. Reserve 4 cols (2 for the leading indent + 2
-	// for the right margin so text doesn't kiss the border).
 	wrapW := c.preview.Width - 4
 	if wrapW < 20 {
 		wrapW = 20
@@ -119,13 +116,15 @@ func (c *Chat) refreshPreview() {
 	wrapStyle := lipgloss.NewStyle().Width(wrapW)
 
 	var b strings.Builder
+	if meta := previewMetaLine(c.theme, p); meta != "" {
+		b.WriteString("  ")
+		b.WriteString(meta)
+		b.WriteString("\n\n")
+	}
 	for i, line := range strings.Split(p.FullText, "\n") {
 		if i > 0 {
 			b.WriteString("\n")
 		}
-		// Wrap one paragraph at a time. Style.Width pads short lines but
-		// that's fine in a TUI viewport — each rendered line stays inside
-		// the preview pane width.
 		wrapped := wrapStyle.Render(line)
 		for j, sub := range strings.Split(wrapped, "\n") {
 			if j > 0 {
@@ -137,6 +136,45 @@ func (c *Chat) refreshPreview() {
 	}
 	c.preview.SetContent(b.String())
 	c.preview.GotoTop()
+}
+
+// previewMetaLine renders a dim 1-line summary atop the preview pane:
+// "claude-sonnet-4-6 · 21s · ↑3.2k (cache 18k) · ↓329".
+func previewMetaLine(t theme.Theme, p data.Prompt) string {
+	parts := []string{}
+	if p.Model != "" {
+		parts = append(parts, t.AccentAlt().Render(p.Model))
+	}
+	if !p.Pending && p.Took > 0 {
+		parts = append(parts, t.Subtitle().Render(formatDelta(p.Took, false)))
+	}
+	if p.InputTokens > 0 || p.CacheReadTokens > 0 || p.CacheCreationTokens > 0 {
+		in := fmt.Sprintf("↑%s", fmtTokens(p.TotalInputTokens()))
+		if p.CacheReadTokens > 0 || p.CacheCreationTokens > 0 {
+			in += t.Dim().Render(fmt.Sprintf(" (cache %s)", fmtTokens(p.CacheReadTokens+p.CacheCreationTokens)))
+		}
+		parts = append(parts, in)
+	}
+	if p.OutputTokens > 0 {
+		parts = append(parts, fmt.Sprintf("↓%s", fmtTokens(p.OutputTokens)))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	sep := t.Dim().Render(" · ")
+	return t.Dim().Render(strings.Join(parts, sep))
+}
+
+// fmtTokens formats an int as 1.2k / 3.4M / 999.
+func fmtTokens(n int) string {
+	switch {
+	case n >= 1_000_000:
+		return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
+	case n >= 1_000:
+		return fmt.Sprintf("%.1fk", float64(n)/1_000)
+	default:
+		return fmt.Sprintf("%d", n)
+	}
 }
 
 func (c *Chat) filteredPrompts() []data.Prompt {
