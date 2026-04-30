@@ -368,15 +368,15 @@ func (c *Chat) Update(msg tea.Msg) (Screen, tea.Cmd) {
 			c.cfg.LayoutSwap = c.swapped
 			_ = config.Save(c.cfg)
 		case key.Matches(msg, c.keys.PaneUp):
-			if c.previewSize < 80 {
-				c.previewSize += 5
+			if c.previewSize > 30 {
+				c.previewSize -= 5
 				c.cfg.PreviewSize = c.previewSize
 				_ = config.Save(c.cfg)
 				c.recomputePanes()
 			}
 		case key.Matches(msg, c.keys.PaneDown):
-			if c.previewSize > 30 {
-				c.previewSize -= 5
+			if c.previewSize < 80 {
+				c.previewSize += 5
 				c.cfg.PreviewSize = c.previewSize
 				_ = config.Save(c.cfg)
 				c.recomputePanes()
