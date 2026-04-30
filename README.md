@@ -23,10 +23,18 @@ different terminals, or different accounts, and want to keep tabs on all
 of them from one place.
 
 <table>
+<tr>
+    <td colspan="2" align="center">
+     <a href=".github/screenshot_main_orgs.png">
+        <img src=".github/screenshot_main_orgs.png" alt="Main menu — org tabs, usage meters, sessions" />
+      </a><br/>
+      <sub><b>All Organizations</b> — every <code>~/.claude*</code> dir rendered as a side-by-side column. <code>←/→</code> moves focus between columns, <code>↑/↓</code> within. Live mem footer in the bottom-right.</sub>
+    </td>
+  </tr>
   <tr>
     <td width="50%" align="center">
-      <a href=".github/screenshot_main_orgs.png">
-        <img src=".github/screenshot_main_orgs.png" alt="Main menu — org tabs, usage meters, sessions" />
+	   <a href=".github/screenshot-session-list.png">
+        <img src=".github/screenshot_session_list.png" alt="All Organizations — every claude config dir as a side-by-side column" />
       </a><br/>
       <sub><b>Main menu</b> — paged org tabs with 5h/7d usage meters, running sessions ●&nbsp;at top, last-active column.</sub>
     </td>
@@ -51,14 +59,7 @@ of them from one place.
       <sub><b>Session chat — horizontal layout</b> — prompt list on the left, preview pane on the right. Resize with <code>alt+↑/↓</code>.</sub>
     </td>
   </tr>
-  <tr>
-    <td colspan="2" align="center">
-      <a href=".github/screenshot-session-list.png">
-        <img src=".github/screenshot-session-list.png" alt="All Organizations — every claude config dir as a side-by-side column" />
-      </a><br/>
-      <sub><b>All Organizations</b> — every <code>~/.claude*</code> dir rendered as a side-by-side column. <code>←/→</code> moves focus between columns, <code>↑/↓</code> within. Live mem footer in the bottom-right.</sub>
-    </td>
-  </tr>
+
 </table>
 
 ## Install
