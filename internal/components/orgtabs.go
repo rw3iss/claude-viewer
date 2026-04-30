@@ -56,7 +56,7 @@ func OrgTabsWithWidths(t theme.Theme, in OrgTabsInput) (string, []int) {
 	}
 
 	// Two leading cols + two cols between each tab (uniform 2-col margin).
-	const tabSep = "  "
+	const tabSep = "    "
 	parts := make([]string, 0, 2*len(tabs)+1)
 	parts = append(parts, tabSep)
 	for i, tab := range tabs {
@@ -126,7 +126,7 @@ func truncOrg(s string) string {
 // the same 2-col leading + 2-col separator OrgTabs uses so they stay
 // aligned beneath the tab strip. Multi-line entries are stacked.
 func JoinTabRow(parts []string) string {
-	const tabSep = "  "
+	const tabSep = "    "
 	out := make([]string, 0, 2*len(parts)+1)
 	out = append(out, tabSep)
 	for i, p := range parts {

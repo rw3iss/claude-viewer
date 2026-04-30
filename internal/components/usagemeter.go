@@ -12,9 +12,9 @@ import (
 
 // Internal meter sizing: keep content readable but bounded so a wide org
 // name doesn't stretch the bar across the whole tab block.
-// meterContentWidth — the meter content (bar + label + pct + countdown)
-// is rendered at a fixed 15-cols wide and centered inside the tab block.
-const meterContentWidth = 15
+// meterContentWidth — minimum width for the meter content. Each meter
+// is rendered at this width and centered inside the surrounding tab block.
+const meterContentWidth = 16
 
 // UsageMeter renders a 2-line meter sized to fit inside blockWidth. The
 // label on each line is the time remaining until that period resets — so
