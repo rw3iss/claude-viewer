@@ -16,18 +16,47 @@ import (
 // is rendered at a fixed 15-cols wide and centered inside the tab block.
 const meterContentWidth = 15
 
-// UsageMeter renders a 2-line meter (5h + 7d) sized to fit comfortably
-// inside blockWidth, with side padding so it doesn't span edge-to-edge.
-// Line format: `5h ████░░ 70% 4h12m`. Tightens (drops countdown, then
-// shrinks bar) when content width is small.
+// UsageMeter renders a 2-line meter sized to fit inside blockWidth. The
+// label on each line is the time remaining until that period resets — so
+// the user sees how much budget time is left, per account, at a glance:
+//   "4h12m ▓▓▓ 5%"     ← top row = 5-hour window
+//   "3d 4h ░░░ 61%"    ← bottom row = 7-day window
+// When no reset-time is known yet (cache miss / first paint), the label
+// falls back to "5h" / "7d" so the slot still indicates which period.
 func UsageMeter(t theme.Theme, u *data.Usage, blockWidth int) string {
 	mw := meterContentWidth
 	if u == nil {
 		return centerLine(t.Dim().Render("…"), blockWidth) + "\n" + centerLine("", blockWidth)
 	}
-	five := meterLine(t, "5h", u.FiveHourPct, u.FiveHourResetAt, mw)
-	seven := meterLine(t, "7d", u.SevenDayPct, u.SevenDayResetAt, mw)
+	fiveLabel := remainingOrFallback(u.FiveHourResetAt, "5h")
+	sevenLabel := remainingOrFallback(u.SevenDayResetAt, "7d")
+
+	// Right-pad labels to the same width so the bars align between rows.
+	w := len(fiveLabel)
+	if len(sevenLabel) > w {
+		w = len(sevenLabel)
+	}
+	fiveLabel = padRight(fiveLabel, w)
+	sevenLabel = padRight(sevenLabel, w)
+
+	five := meterLine(t, fiveLabel, u.FiveHourPct, mw)
+	seven := meterLine(t, sevenLabel, u.SevenDayPct, mw)
 	return centerLine(five, blockWidth) + "\n" + centerLine(seven, blockWidth)
+}
+
+func remainingOrFallback(reset time.Time, fallback string) string {
+	r := formatRemaining(reset)
+	if r == "" || r == "—" {
+		return fallback
+	}
+	return r
+}
+
+func padRight(s string, w int) string {
+	if len(s) >= w {
+		return s
+	}
+	return s + strings.Repeat(" ", w-len(s))
 }
 
 // UsageMeterError renders a 2-line dim error block, centered in blockWidth.
@@ -39,7 +68,10 @@ func UsageMeterError(t theme.Theme, err string, blockWidth int) string {
 	return centerLine(t.AlertWarn().Render("usage err"), blockWidth) + "\n" + centerLine(t.Dim().Render(err), blockWidth)
 }
 
-func meterLine(t theme.Theme, label string, pct int, resetAt time.Time, totalW int) string {
+// meterLine renders one bar like "<label> ▓▓░░ <pct>%". The label IS the
+// countdown to the period reset (or "5h"/"7d" if not yet known); the
+// bar takes whatever cells remain after label and percentage.
+func meterLine(t theme.Theme, label string, pct int, totalW int) string {
 	if pct < 0 {
 		pct = 0
 	}
@@ -47,23 +79,11 @@ func meterLine(t theme.Theme, label string, pct int, resetAt time.Time, totalW i
 		pct = 999
 	}
 	pctStr := fmt.Sprintf("%d%%", pct)
-	countdown := formatRemaining(resetAt)
-
-	// Layouts in order of preference:
-	//   "5h ████░ 70% 4h12m"   (full)
-	//   "5h ████░ 70%"         (no countdown)
-	//   "5h 70%"               (text-only, narrow)
-	full := len(label) + 1 + 1 + 1 + len(pctStr) + 1 + len(countdown)
-	med := len(label) + 1 + 1 + 1 + len(pctStr)
-	narrow := len(label) + 1 + len(pctStr)
+	full := len(label) + 1 + 1 + 1 + len(pctStr)   // label + space + bar(>=1) + space + pct
+	narrow := len(label) + 1 + len(pctStr)         // text-only fallback
 
 	switch {
-	case totalW >= full+3:
-		barW := totalW - len(label) - len(pctStr) - len(countdown) - 3
-		bar := buildBar(t, pct, barW)
-		s := fmt.Sprintf("%s %s %s %s", label, bar, t.Subtitle().Render(pctStr), t.Dim().Render(countdown))
-		return centerLine(s, totalW)
-	case totalW >= med+3:
+	case totalW >= full+1:
 		barW := totalW - len(label) - len(pctStr) - 2
 		bar := buildBar(t, pct, barW)
 		s := fmt.Sprintf("%s %s %s", label, bar, t.Subtitle().Render(pctStr))
