@@ -96,7 +96,7 @@ func LoadPrompts(path string) ([]Prompt, error) {
 					if isSkippableUserText(content) {
 						goto cont
 					}
-					full := content
+					full := cleanFullText(content)
 					cleaned := cleanText(content)
 					if cleaned == "" {
 						goto cont
@@ -178,20 +178,45 @@ func parseTime(s string) (time.Time, bool) {
 }
 
 var (
+	// tagBlock = wholesale-strip these blocks (Claude Code system-emitted
+	// metadata that the user never wrote and shouldn't see).
 	tagBlock = regexp.MustCompile(`(?s)<(system-reminder|local-command-stdout|local-command-stderr|local-command-caveat)>.*?</[^>]+>`)
-	tagInline = regexp.MustCompile(`<(command-message|command-args)>[^<]*</[^>]+>`)
-	cmdName  = regexp.MustCompile(`<command-name>([^<]*)</command-name>`)
-	multiNL  = regexp.MustCompile(`\n+`)
-	multiWS  = regexp.MustCompile(`\s+`)
+
+	// commandTag = unwrap these to their inner text (the user typed a
+	// slash-command; Claude Code wraps the parts as XML, but the message
+	// the user actually sent is the concatenated inner text).
+	commandTag = regexp.MustCompile(`<(command-message|command-name|command-args|command-stdout|command-stderr)>([^<]*)</[^>]+>`)
+
+	multiNL = regexp.MustCompile(`\n+`)
+	multiWS = regexp.MustCompile(`\s+`)
 )
 
+// cleanText is for the list-row preview: tags stripped, newlines collapsed
+// to a visible "⏎" marker, all whitespace squeezed.
 func cleanText(s string) string {
 	s = tagBlock.ReplaceAllString(s, "")
-	s = tagInline.ReplaceAllString(s, "")
-	s = cmdName.ReplaceAllString(s, "/$1")
+	s = unwrapCommandTags(s)
 	s = multiNL.ReplaceAllString(s, " ⏎ ")
 	s = multiWS.ReplaceAllString(s, " ")
 	return strings.TrimSpace(s)
+}
+
+// cleanFullText is for the full-content preview pane: same tag handling
+// but newlines/indentation are preserved so the text reads naturally.
+func cleanFullText(s string) string {
+	s = tagBlock.ReplaceAllString(s, "")
+	s = unwrapCommandTags(s)
+	return strings.TrimSpace(s)
+}
+
+// unwrapCommandTags replaces each <command-X>inner</command-X> with just
+// its inner text. So
+//   "<command-message>improve</command-message>\n<command-name>/improve</command-name>"
+// becomes
+//   "improve\n/improve"
+// — i.e. what the user actually typed before Claude Code wrapped it.
+func unwrapCommandTags(s string) string {
+	return commandTag.ReplaceAllString(s, "$2")
 }
 
 func isSkippableUserText(s string) bool {
