@@ -51,6 +51,14 @@ of them from one place.
       <sub><b>Session chat — horizontal layout</b> — prompt list on the left, preview pane on the right. Resize with <code>alt+↑/↓</code>.</sub>
     </td>
   </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <a href=".github/screenshot-session-list.png">
+        <img src=".github/screenshot-session-list.png" alt="All Organizations — every claude config dir as a side-by-side column" />
+      </a><br/>
+      <sub><b>All Organizations</b> — every <code>~/.claude*</code> dir rendered as a side-by-side column. <code>←/→</code> moves focus between columns, <code>↑/↓</code> within. Live mem footer in the bottom-right.</sub>
+    </td>
+  </tr>
 </table>
 
 ## Install
