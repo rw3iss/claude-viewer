@@ -56,7 +56,7 @@ func OrgTabsWithWidths(t theme.Theme, in OrgTabsInput) (string, []int) {
 	}
 
 	// Two leading cols + two cols between each tab (uniform 2-col margin).
-	const tabSep = "    "
+	const tabSep = TabSeparator
 	parts := make([]string, 0, 2*len(tabs)+1)
 	parts = append(parts, tabSep)
 	for i, tab := range tabs {
@@ -68,12 +68,12 @@ func OrgTabsWithWidths(t theme.Theme, in OrgTabsInput) (string, []int) {
 	return lipgloss.JoinHorizontal(lipgloss.Top, parts...), widths
 }
 
-// orgNameMaxLineWidth caps how wide a single org-name line can be — beyond
-// this we wrap (if multi-word) or truncate.
-const orgNameMaxLineWidth = 30
-
-// orgWrapThreshold — orgs at or below this width stay on one line.
-const orgWrapThreshold = 20
+// Aliases of the central layout constants; kept as local names so the
+// existing call sites in this file read naturally.
+const (
+	orgNameMaxLineWidth = OrgNameMaxLineWidth
+	orgWrapThreshold    = OrgWrapThreshold
+)
 
 // wrapOrgName splits a long org name across two lines at the most balanced
 // space. Returns 1 line for short or single-word names. Each line is
@@ -115,18 +115,15 @@ func wrapOrgName(name string) []string {
 	}
 }
 
-func truncOrg(s string) string {
-	if lipgloss.Width(s) <= orgNameMaxLineWidth {
-		return s
-	}
-	return s[:orgNameMaxLineWidth-1] + "…"
-}
+// truncOrg shortens an org-name line to orgNameMaxLineWidth cells. Thin
+// wrapper around the shared Truncate helper.
+func truncOrg(s string) string { return Truncate(s, orgNameMaxLineWidth) }
 
 // JoinTabRow takes per-tab strings (e.g. usage meters) and joins them with
 // the same 2-col leading + 2-col separator OrgTabs uses so they stay
 // aligned beneath the tab strip. Multi-line entries are stacked.
 func JoinTabRow(parts []string) string {
-	const tabSep = "    "
+	const tabSep = TabSeparator
 	out := make([]string, 0, 2*len(parts)+1)
 	out = append(out, tabSep)
 	for i, p := range parts {

@@ -23,13 +23,12 @@ type Menu struct {
 	width   int
 	height  int
 
-	dirs      []data.ClaudeDir // enabled only
-	pageIdx   int
-	sessions  []data.Session // for current page
-	selected  int
+	dirs     []data.ClaudeDir // enabled only
+	pageIdx  int
+	sessions []data.Session // for current page
+	selected int
 
-	usage    map[string]*data.Usage // keyed by ClaudeDir.Path
-	usageErr map[string]string
+	usage usageState // 5h/7d meter data + per-dir error tracking
 
 	alert       components.Alert
 	helpVisible bool
@@ -38,12 +37,11 @@ type Menu struct {
 // NewMenu builds the main menu screen.
 func NewMenu(repo data.Repository, cfg *config.Config, t theme.Theme, k keys.Map) *Menu {
 	m := &Menu{
-		repo:     repo,
-		cfg:      cfg,
-		theme:    t,
-		keys:     k,
-		usage:    map[string]*data.Usage{},
-		usageErr: map[string]string{},
+		repo:  repo,
+		cfg:   cfg,
+		theme: t,
+		keys:  k,
+		usage: newUsageState(),
 	}
 	m.refresh()
 	return m
@@ -52,10 +50,7 @@ func NewMenu(repo data.Repository, cfg *config.Config, t theme.Theme, k keys.Map
 // menuFetchAllUsage batches usage fetches across the menu's enabled dirs.
 // Skipped (returns nil) when the feature is disabled in config.
 func (m *Menu) menuFetchAllUsage(force bool) tea.Cmd {
-	if !m.cfg.ShowUsageMeters {
-		return nil
-	}
-	return fetchAllUsageCmd(m.repo, m.dirs, force)
+	return usageFetchCmd(m.cfg.ShowUsageMeters, m.repo, m.dirs, force)
 }
 
 func (m *Menu) refresh() {
@@ -87,12 +82,7 @@ func (m *Menu) SetSize(w, h int) { m.width, m.height = w, h }
 func (m *Menu) Update(msg tea.Msg) (Screen, tea.Cmd) {
 	switch msg := msg.(type) {
 	case UsageMsg:
-		if msg.Err != nil {
-			m.usageErr[msg.DirPath] = msg.Err.Error()
-		} else {
-			delete(m.usageErr, msg.DirPath)
-			m.usage[msg.DirPath] = msg.Usage
-		}
+		m.usage.Apply(msg)
 		return m, nil
 	case components.AlertExpiredMsg:
 		m.alert = components.Alert{}
@@ -202,13 +192,10 @@ func (m *Menu) View() string {
 		parts := make([]string, len(m.dirs))
 		for i, d := range m.dirs {
 			w := tabWidths[i]
-			if errMsg, has := m.usageErr[d.Path]; has {
+			if errMsg := m.usage.Err(d.Path); errMsg != "" {
 				parts[i] = components.UsageMeterError(m.theme, errMsg, w)
-			} else if u := m.usage[d.Path]; u != nil {
-				parts[i] = components.UsageMeter(m.theme, u, w)
 			} else {
-				// still loading
-				parts[i] = components.UsageMeter(m.theme, nil, w)
+				parts[i] = components.UsageMeter(m.theme, m.usage.Get(d.Path), w)
 			}
 		}
 		meterRow = "\n" + components.JoinTabRow(parts)
@@ -235,7 +222,7 @@ func (m *Menu) View() string {
 	// If the focused org has a usage error, surface the full message in
 	// the footer (the meter slot truncates it).
 	if m.cfg.ShowUsageMeters && m.alert.Text == "" && m.pageIdx < len(m.dirs) {
-		if errMsg, has := m.usageErr[m.dirs[m.pageIdx].Path]; has {
+		if errMsg := m.usage.Err(m.dirs[m.pageIdx].Path); errMsg != "" {
 			footer = m.theme.AlertWarn().Render("usage error: ") + m.theme.Dim().Render(errMsg)
 		}
 	}

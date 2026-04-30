@@ -10,11 +10,8 @@ import (
 	"github.com/rw3iss/claude-viewer/internal/theme"
 )
 
-// Internal meter sizing: keep content readable but bounded so a wide org
-// name doesn't stretch the bar across the whole tab block.
-// meterContentWidth — minimum width for the meter content. Each meter
-// is rendered at this width and centered inside the surrounding tab block.
-const meterContentWidth = 16
+// meterContentWidth aliases the central layout constant for naming.
+const meterContentWidth = MeterContentWidth
 
 // UsageMeter renders a 2-line meter sized to fit inside blockWidth. The
 // label on each line is the time remaining until that period resets — so

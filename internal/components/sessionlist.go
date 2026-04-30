@@ -95,9 +95,9 @@ func SessionList(t theme.Theme, in SessionListInput) string {
 	return b.String()
 }
 
-// lastActiveColWidth is the fixed reservation for the "- 7h 12m ago (Apr 2 14:23)"
-// column. Sized to fit the worst case ("- 99d 23h ago (Jan 22 23:59)" ≈ 28 cols).
-const lastActiveColWidth = 28
+// lastActiveColWidth aliases the central layout constant; kept as a name
+// here so the renderRow code reads naturally.
+const lastActiveColWidth = LastActiveColWidth
 
 func renderRow(t theme.Theme, s data.Session, width int, selected, fade bool) string {
 	// Leading marker column: green ● when a live process holds the file
@@ -152,27 +152,10 @@ func renderRow(t theme.Theme, s data.Session, width int, selected, fade bool) st
 	}
 }
 
-// smartTruncate shortens s to maxW visible cells. For path-like strings
-// (containing "/") it keeps the tail visible — e.g.
-// "~/Sites/ven/other/scheduler-invoke-lambda" → "…r-invoke-lambda" — since
-// the trailing folder is the meaningful identifier. Non-path strings get
-// the usual prefix-truncation with ellipsis.
-func smartTruncate(s string, maxW int) string {
-	if maxW <= 0 {
-		return ""
-	}
-	if lipgloss.Width(s) <= maxW {
-		return s
-	}
-	if maxW < 2 {
-		return s[:maxW]
-	}
-	if strings.Contains(s, "/") {
-		// Keep the last (maxW-1) bytes of s + leading ellipsis.
-		return "…" + s[len(s)-maxW+1:]
-	}
-	return s[:maxW-1] + "…"
-}
+// smartTruncate is a thin alias for the path-aware truncation helper in
+// textutil.go. Kept as a name in this file so existing call sites read
+// naturally; new code should call TruncatePath directly.
+func smartTruncate(s string, maxW int) string { return TruncatePath(s, maxW) }
 
 // formatLastActive renders a session's mtime as a relative string with the
 // absolute timestamp in parens, e.g. "- 7h 12m ago (Apr 29 18:30)".

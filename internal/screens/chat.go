@@ -24,6 +24,27 @@ import (
 	"github.com/rw3iss/claude-viewer/internal/theme"
 )
 
+// dividerW is the visible-cell width of the vertical divider between the
+// list pane and the preview pane in horizontal (right) layout. 4 cells:
+// 2-col left padding, the bar glyph, 1-col right padding.
+const dividerW = 4
+
+// verticalDivider builds an N-line column matching the body height so the
+// bar character spans every row (rather than only the first when relying
+// on lipgloss.JoinHorizontal padding).
+func verticalDivider(t theme.Theme, height int) string {
+	bar := t.Subtitle().Render("│")
+	line := "  " + bar + " " // 2 left + bar + 1 right = dividerW cells
+	if height < 1 {
+		return line
+	}
+	lines := make([]string, height)
+	for i := range lines {
+		lines[i] = line
+	}
+	return strings.Join(lines, "\n")
+}
+
 // Chat = the session detail screen. Lists prompts (newest-first, wrap-N) on
 // the left/top, full content of selected prompt on the right/bottom.
 type Chat struct {
@@ -214,7 +235,7 @@ func (c *Chat) paneSizes() (listW, listH, prevW, prevH int) {
 	bodyH = max(bodyH, 5)
 	if c.layout == "right" {
 		prevW = c.width * c.previewSize / 100
-		listW = c.width - prevW - 1
+		listW = c.width - prevW - dividerW
 		prevH = bodyH
 		listH = bodyH
 	} else {
@@ -405,7 +426,8 @@ func (c *Chat) View() string {
 
 	var body string
 	if c.layout == "right" {
-		body = lipgloss.JoinHorizontal(lipgloss.Top, listView, c.theme.Border().Render("│"), previewView)
+		divider := verticalDivider(c.theme, listH)
+		body = lipgloss.JoinHorizontal(lipgloss.Top, listView, divider, previewView)
 	} else {
 		borderW := c.width - 2
 		borderW = max(borderW, 1)

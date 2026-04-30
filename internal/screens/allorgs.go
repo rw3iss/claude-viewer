@@ -14,24 +14,9 @@ import (
 	"github.com/rw3iss/claude-viewer/internal/theme"
 )
 
-// truncateAnsi truncates a possibly-styled string to at most maxW visible
-// cells, appending an ellipsis if it had to cut. lipgloss.Width handles the
-// ANSI-aware width calc; the slice is byte-based, so we re-style as needed.
-func truncateAnsi(s string, maxW int) string {
-	if lipgloss.Width(s) <= maxW {
-		return s
-	}
-	// Naive: lop off bytes until visible width fits. Works for our case
-	// because labels (.claude, .claude-2, .claude-work) are ASCII; ANSI
-	// escapes are at the start/end so trimming from the end is safe.
-	for i := len(s); i > 0; i-- {
-		cand := s[:i]
-		if lipgloss.Width(cand) <= maxW-1 {
-			return cand + "…"
-		}
-	}
-	return ""
-}
+// truncateAnsi delegates to the shared ANSI-aware truncation helper.
+// Kept as a local alias so the call sites in this file read naturally.
+func truncateAnsi(s string, maxW int) string { return components.TruncateAnsi(s, maxW) }
 
 // AllOrgs renders every enabled ClaudeDir as a column on one screen.
 type AllOrgs struct {
@@ -42,13 +27,12 @@ type AllOrgs struct {
 	width  int
 	height int
 
-	dirs    []data.ClaudeDir
-	cols    [][]data.Session // sessions per dir
-	colIdx  int              // focused column
-	rowIdx  []int            // selected row per column
+	dirs   []data.ClaudeDir
+	cols   [][]data.Session // sessions per dir
+	colIdx int              // focused column
+	rowIdx []int            // selected row per column
 
-	usage    map[string]*data.Usage
-	usageErr map[string]string
+	usage usageState // 5h/7d meter data + per-dir error tracking
 
 	alert       components.Alert
 	helpVisible bool
@@ -57,12 +41,11 @@ type AllOrgs struct {
 // NewAllOrgs builds the multi-column screen.
 func NewAllOrgs(repo data.Repository, cfg *config.Config, t theme.Theme, k keys.Map) *AllOrgs {
 	a := &AllOrgs{
-		repo:     repo,
-		cfg:      cfg,
-		theme:    t,
-		keys:     k,
-		usage:    map[string]*data.Usage{},
-		usageErr: map[string]string{},
+		repo:  repo,
+		cfg:   cfg,
+		theme: t,
+		keys:  k,
+		usage: newUsageState(),
 	}
 	a.refresh()
 	return a
@@ -71,10 +54,7 @@ func NewAllOrgs(repo data.Repository, cfg *config.Config, t theme.Theme, k keys.
 // allOrgsFetchUsage batches usage fetches across enabled dirs (skipped when
 // the meters setting is off).
 func (a *AllOrgs) allOrgsFetchUsage(force bool) tea.Cmd {
-	if !a.cfg.ShowUsageMeters {
-		return nil
-	}
-	return fetchAllUsageCmd(a.repo, a.dirs, force)
+	return usageFetchCmd(a.cfg.ShowUsageMeters, a.repo, a.dirs, force)
 }
 
 func (a *AllOrgs) refresh() {
@@ -96,12 +76,7 @@ func (a *AllOrgs) SetSize(w, h int) { a.width, a.height = w, h }
 func (a *AllOrgs) Update(msg tea.Msg) (Screen, tea.Cmd) {
 	switch msg := msg.(type) {
 	case UsageMsg:
-		if msg.Err != nil {
-			a.usageErr[msg.DirPath] = msg.Err.Error()
-		} else {
-			delete(a.usageErr, msg.DirPath)
-			a.usage[msg.DirPath] = msg.Usage
-		}
+		a.usage.Apply(msg)
 		return a, nil
 	case tea.KeyMsg:
 		if a.helpVisible {
@@ -204,10 +179,10 @@ func (a *AllOrgs) View() string {
 		// Optional usage meter centered above the session list.
 		if a.cfg.ShowUsageMeters {
 			var meter string
-			if errMsg, has := a.usageErr[d.Path]; has {
+			if errMsg := a.usage.Err(d.Path); errMsg != "" {
 				meter = components.UsageMeterError(a.theme, errMsg, colW)
 			} else {
-				meter = components.UsageMeter(a.theme, a.usage[d.Path], colW)
+				meter = components.UsageMeter(a.theme, a.usage.Get(d.Path), colW)
 			}
 			title += "\n" + meter
 		}

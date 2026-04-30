@@ -33,7 +33,7 @@ of them from one place.
   </tr>
   <tr>
     <td width="50%" align="center">
-	   <a href=".github/screenshot-session-list.png">
+	   <a href=".github/screenshot_session_list.png">
         <img src=".github/screenshot_session_list.png" alt="All Organizations — every claude config dir as a side-by-side column" />
       </a><br/>
       <sub><b>Main menu</b> — paged org tabs with 5h/7d usage meters, running sessions ●&nbsp;at top, last-active column.</sub>
