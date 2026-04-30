@@ -234,6 +234,13 @@ func (m *Menu) View() string {
 	})
 
 	footer := components.RenderAlert(m.theme, m.alert)
+	// If the focused org has a usage error, surface the full message in
+	// the footer (the meter slot truncates it).
+	if m.cfg.ShowUsageMeters && m.alert.Text == "" && m.pageIdx < len(m.dirs) {
+		if errMsg, has := m.usageErr[m.dirs[m.pageIdx].Path]; has {
+			footer = m.theme.AlertWarn().Render("usage error: ") + m.theme.Dim().Render(errMsg)
+		}
+	}
 	return header + "\n\n" + tabs + meterRow + "\n\n" + body + "\n" + footer
 }
 

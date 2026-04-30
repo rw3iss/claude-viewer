@@ -60,12 +60,29 @@ func padRight(s string, w int) string {
 }
 
 // UsageMeterError renders a 2-line dim error block, centered in blockWidth.
+// The error message is preprocessed to strip outer wrapping and keep the
+// most informative tail (e.g. "fetch usage for .claude-2: usage api 401:
+// Unauthorized" → "401: Unauth…"), so the user sees the actual cause.
 func UsageMeterError(t theme.Theme, err string, blockWidth int) string {
 	mw := meterContentWidth
-	if len(err) > mw {
-		err = err[:mw-1] + "…"
+	msg := stripErrPrefix(err)
+	if len(msg) > mw {
+		// Tail-truncate: the actual cause is usually at the end.
+		msg = "…" + msg[len(msg)-mw+1:]
 	}
-	return centerLine(t.AlertWarn().Render("usage err"), blockWidth) + "\n" + centerLine(t.Dim().Render(err), blockWidth)
+	return centerLine(t.AlertWarn().Render("usage err"), blockWidth) + "\n" + centerLine(t.Dim().Render(msg), blockWidth)
+}
+
+// stripErrPrefix strips known wrapping prefixes ("fetch usage for X: ",
+// "usage api: ") so the deepest error reaches the screen.
+func stripErrPrefix(s string) string {
+	for {
+		i := strings.Index(s, ": ")
+		if i <= 0 || i > 40 {
+			return s
+		}
+		s = s[i+2:]
+	}
 }
 
 // meterLine renders one bar like "<label> ▓▓░░ <pct>%". The label IS the
