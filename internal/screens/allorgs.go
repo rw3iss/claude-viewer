@@ -192,9 +192,16 @@ func joinHorizontal(cols []string, height, colW int, t theme.Theme) string {
 	splits := make([][]string, len(cols))
 	for i, c := range cols {
 		splits[i] = strings.Split(c, "\n")
-		// pad to height
+		// pad height with empty rows
 		for len(splits[i]) < height {
-			splits[i] = append(splits[i], strings.Repeat(" ", colW))
+			splits[i] = append(splits[i], "")
+		}
+		// pad each row to exactly colW visible cells so the column
+		// divider lands at the same position on every row.
+		for r, line := range splits[i] {
+			if w := lipgloss.Width(line); w < colW {
+				splits[i][r] = line + strings.Repeat(" ", colW-w)
+			}
 		}
 	}
 	var lines []string

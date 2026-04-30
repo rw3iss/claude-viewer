@@ -74,7 +74,8 @@ func SessionList(t theme.Theme, in SessionListInput) string {
 
 	rows := make([]string, 0, len(in.Sessions)+1)
 	for _, e := range running {
-		rows = append(rows, renderRow(t, e.s, in.Width, e.idx == in.SelectedIdx, e.fade))
+		isCursor := in.IsFocused && e.idx == in.SelectedIdx
+		rows = append(rows, renderRow(t, e.s, in.Width, isCursor, e.fade))
 	}
 	if len(running) > 0 && len(rest) > 0 {
 		bw := in.Width - 2
@@ -84,7 +85,8 @@ func SessionList(t theme.Theme, in SessionListInput) string {
 		rows = append(rows, t.Border().Render(strings.Repeat("─", bw)))
 	}
 	for _, e := range rest {
-		rows = append(rows, renderRow(t, e.s, in.Width, e.idx == in.SelectedIdx, e.fade))
+		isCursor := in.IsFocused && e.idx == in.SelectedIdx
+		rows = append(rows, renderRow(t, e.s, in.Width, isCursor, e.fade))
 	}
 
 	// Scroll: keep selected in view
