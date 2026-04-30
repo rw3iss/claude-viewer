@@ -35,24 +35,27 @@ type Map struct {
 	Help     key.Binding
 }
 
-// Default returns the built-in keymap.
+// Default returns the built-in keymap. Single-letter shortcuts are
+// preferred for actions; vim-style nav aliases (h/j/k/l) are intentionally
+// dropped so those letters can carry meaningful actions in the chat
+// screen (l = layout, etc).
 func Default() Map {
 	return Map{
-		Up:       key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up")),
-		Down:     key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down")),
-		Left:     key.NewBinding(key.WithKeys("left", "h"), key.WithHelp("←/h", "prev org")),
-		Right:    key.NewBinding(key.WithKeys("right", "l"), key.WithHelp("→/l", "next org")),
+		Up:       key.NewBinding(key.WithKeys("up"), key.WithHelp("↑", "up")),
+		Down:     key.NewBinding(key.WithKeys("down"), key.WithHelp("↓", "down")),
+		Left:     key.NewBinding(key.WithKeys("left"), key.WithHelp("←", "prev org")),
+		Right:    key.NewBinding(key.WithKeys("right"), key.WithHelp("→", "next org")),
 		Enter:    key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open")),
 		Esc:      key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
 		Quit:     key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 		Tab:      key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "toggle preview")),
-		Reload:   key.NewBinding(key.WithKeys("ctrl+r"), key.WithHelp("ctrl+r", "reload")),
+		Reload:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reload")),
 		Settings: key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "settings")),
 		AllOrgs:  key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "all orgs")),
-		Search:   key.NewBinding(key.WithKeys("ctrl+f", "/"), key.WithHelp("ctrl+f", "search")),
-		Copy:     key.NewBinding(key.WithKeys("ctrl+y"), key.WithHelp("ctrl+y", "copy")),
-		Save:     key.NewBinding(key.WithKeys("ctrl+o"), key.WithHelp("ctrl+o", "save")),
-		Layout:   key.NewBinding(key.WithKeys("ctrl+l"), key.WithHelp("ctrl+l", "layout")),
+		Search:   key.NewBinding(key.WithKeys("f", "/"), key.WithHelp("f", "search")),
+		Copy:     key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy")),
+		Save:     key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "export")),
+		Layout:   key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "layout")),
 		RowsUp:   key.NewBinding(key.WithKeys("ctrl+up"), key.WithHelp("ctrl+↑", "more rows")),
 		RowsDown: key.NewBinding(key.WithKeys("ctrl+down"), key.WithHelp("ctrl+↓", "fewer rows")),
 		PaneUp:   key.NewBinding(key.WithKeys("alt+up"), key.WithHelp("alt+↑", "bigger preview")),

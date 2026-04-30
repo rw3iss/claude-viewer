@@ -16,7 +16,7 @@ func helpForMenu() []components.HelpSection {
 			{Key: "o", Desc: "settings (enable/disable dirs, add custom)"},
 		}},
 		{Title: "Misc", Entries: []components.HelpEntry{
-			{Key: "ctrl+r", Desc: "reload current page from disk"},
+			{Key: "r", Desc: "reload current page from disk"},
 			{Key: "h / ?", Desc: "this help"},
 			{Key: "q / esc", Desc: "quit"},
 		}},
@@ -32,9 +32,9 @@ func helpForAllOrgs() []components.HelpSection {
 			{Key: "enter", Desc: "open session"},
 		}},
 		{Title: "Misc", Entries: []components.HelpEntry{
-			{Key: "ctrl+r", Desc: "reload all dirs"},
+			{Key: "r", Desc: "reload all dirs"},
 			{Key: "h / ?", Desc: "this help"},
-			{Key: "esc", Desc: "menu (back)"},
+			{Key: "a / esc", Desc: "back to menu"},
 			{Key: "q", Desc: "quit"},
 		}},
 	}
@@ -67,21 +67,22 @@ func helpForChat() []components.HelpSection {
 			{Key: "↑/↓", Desc: "select prompt"},
 			{Key: "pgup/pgdn", Desc: "jump 10"},
 			{Key: "home/end", Desc: "first / last"},
+			{Key: "enter", Desc: "open the highlighted prompt full-screen"},
 		}},
 		{Title: "Actions", Entries: []components.HelpEntry{
-			{Key: "ctrl+f / /", Desc: "toggle search filter"},
-			{Key: "ctrl+y", Desc: "copy highlighted prompt to clipboard"},
-			{Key: "ctrl+o", Desc: "save highlighted prompt to current directory"},
-			{Key: "ctrl+r", Desc: "reload from disk"},
+			{Key: "f / /", Desc: "toggle search filter"},
+			{Key: "c", Desc: "copy highlighted prompt to clipboard"},
+			{Key: "e", Desc: "export highlighted prompt to current directory"},
+			{Key: "r", Desc: "reload from disk"},
 		}},
 		{Title: "Layout", Entries: []components.HelpEntry{
-			{Key: "ctrl+l", Desc: "toggle bottom ↔ right preview layout"},
+			{Key: "l", Desc: "toggle bottom ↔ right preview layout"},
 			{Key: "ctrl+↑/↓", Desc: "wrap rows per prompt (1–8)"},
 			{Key: "alt+↑/↓", Desc: "grow/shrink the preview pane"},
 		}},
 		{Title: "Misc", Entries: []components.HelpEntry{
 			{Key: "h / ?", Desc: "this help"},
-			{Key: "esc", Desc: "menu (back)"},
+			{Key: "esc", Desc: "menu (back) — closes full-screen view first if open"},
 			{Key: "q", Desc: "quit"},
 		}},
 	}

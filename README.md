@@ -138,20 +138,24 @@ cv                       # alias for `claude-viewer`
 
 ### Keys (chat screen)
 
-| Key            | Action                                  |
-| -------------- | --------------------------------------- |
-| `↑/↓`          | navigate prompts                        |
-| `pgup/pgdn`    | jump 10                                 |
-| `home/end`     | first/last                              |
-| `ctrl+f` / `/` | toggle search filter                    |
-| `ctrl+y`       | copy highlighted prompt to clipboard    |
-| `ctrl+o`       | save highlighted prompt to `$CWD/...`   |
-| `ctrl+l`       | toggle bottom ↔ right preview layout    |
-| `ctrl+↑/↓`     | wrap rows per prompt (1–8)              |
-| `alt+↑/↓`      | grow/shrink the preview pane            |
-| `ctrl+r`       | reload from disk                        |
-| `esc`          | back to menu                            |
-| `q`            | quit                                    |
+| Key            | Action                                                 |
+| -------------- | ------------------------------------------------------ |
+| `↑/↓`          | navigate prompts                                       |
+| `pgup/pgdn`    | jump 10                                                |
+| `home/end`     | first/last                                             |
+| `enter`        | open the highlighted prompt **full-screen**            |
+| `f` / `/`      | toggle search filter                                   |
+| `c`            | copy highlighted prompt to clipboard                   |
+| `e`            | export highlighted prompt to `$CWD/claude-prompt-…txt` |
+| `l`            | toggle bottom ↔ right preview layout                   |
+| `ctrl+↑/↓`     | wrap rows per prompt (1–8)                             |
+| `alt+↑/↓`      | grow/shrink the preview pane                           |
+| `r`            | reload from disk                                       |
+| `esc`          | menu (or close full-screen view if open)               |
+| `q`            | quit                                                   |
+
+In **full-screen view**, only `↑/↓` (scroll), `c` (copy), `e` (export),
+`esc`/`enter` (close), and `q` (quit) are active.
 
 Live-reload via `fsnotify` is automatic — new prompts appear within ~300ms.
 

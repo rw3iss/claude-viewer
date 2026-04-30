@@ -169,7 +169,7 @@ func (m *Menu) View() string {
 			Width:    m.width, Height: m.height,
 		})
 	}
-	hint := "←/→ org · ↑/↓ select · enter open · a all-orgs · o settings · h help · ctrl+r reload · q quit"
+	hint := "←/→ org · ↑/↓ select · enter open · a all-orgs · o settings · r reload · h help · q quit"
 	header := components.Header(m.theme, *m.cfg, components.HeaderInput{
 		Title:   "Claude Viewer",
 		HintRow: hint,

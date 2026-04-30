@@ -139,7 +139,7 @@ func (a *AllOrgs) View() string {
 			Width:    a.width, Height: a.height,
 		})
 	}
-	hint := "←/→ column · ↑/↓ row · enter open · a / esc back · h help · ctrl+r reload"
+	hint := "←/→ column · ↑/↓ row · enter open · a / esc back · r reload · h help"
 	header := components.Header(a.theme, *a.cfg, components.HeaderInput{
 		Title:   "All Organizations",
 		HintRow: hint,

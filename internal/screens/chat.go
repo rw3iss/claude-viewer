@@ -67,12 +67,14 @@ type Chat struct {
 	searchInput  textinput.Model
 	filter       string
 
-	preview viewport.Model
+	preview  viewport.Model
+	fullView viewport.Model
 
-	alert       components.Alert
-	watcher     *fsnotify.Watcher
-	watchEvents chan struct{}
-	helpVisible bool
+	alert           components.Alert
+	watcher         *fsnotify.Watcher
+	watchEvents     chan struct{}
+	helpVisible     bool
+	fullViewActive  bool // when true, render the selected prompt full-screen
 }
 
 // NewChat constructs a chat-detail screen.
@@ -246,6 +248,27 @@ func (c *Chat) paneSizes() (listW, listH, prevW, prevH int) {
 
 // Update handles input.
 func (c *Chat) Update(msg tea.Msg) (Screen, tea.Cmd) {
+	// Full-view mode: scrolling + a small set of action keys, esc/enter to close.
+	if c.fullViewActive {
+		if km, ok := msg.(tea.KeyMsg); ok {
+			switch {
+			case key.Matches(km, c.keys.Esc), key.Matches(km, c.keys.Enter):
+				c.fullViewActive = false
+				return c, nil
+			case key.Matches(km, c.keys.Quit):
+				c.stopWatcher()
+				return c, func() tea.Msg { return events.QuitAppMsg{} }
+			case key.Matches(km, c.keys.Copy):
+				return c, c.copySelected()
+			case key.Matches(km, c.keys.Save):
+				return c, c.exportSelected()
+			}
+		}
+		var cmd tea.Cmd
+		c.fullView, cmd = c.fullView.Update(msg)
+		return c, cmd
+	}
+
 	if c.searchActive {
 		var cmd tea.Cmd
 		if m, ok := msg.(tea.KeyMsg); ok {
@@ -369,29 +392,111 @@ func (c *Chat) Update(msg tea.Msg) (Screen, tea.Cmd) {
 			c.searchInput.Focus()
 			return c, textinput.Blink
 		case key.Matches(msg, c.keys.Copy):
-			if c.cursor < len(filtered) {
-				if err := clipboard.Copy(filtered[c.cursor].FullText); err != nil {
-					c.alert = components.Alert{Text: err.Error(), Level: components.AlertErr, Expires: time.Now().Add(3 * time.Second)}
-				} else {
-					c.alert = components.Alert{Text: "copied to clipboard", Level: components.AlertOK, Expires: time.Now().Add(2 * time.Second)}
-				}
-				return c, components.AlertCmd(time.Now().UnixNano(), 2*time.Second)
-			}
+			return c, c.copySelected()
 		case key.Matches(msg, c.keys.Save):
-			if c.cursor < len(filtered) {
-				name := fmt.Sprintf("claude-prompt-%s.txt", filtered[c.cursor].Time.Format("2006-01-02-150405"))
-				cwd, _ := os.Getwd()
-				out := filepath.Join(cwd, name)
-				if err := os.WriteFile(out, []byte(filtered[c.cursor].FullText), 0o644); err != nil {
-					c.alert = components.Alert{Text: err.Error(), Level: components.AlertErr, Expires: time.Now().Add(3 * time.Second)}
-				} else {
-					c.alert = components.Alert{Text: "saved " + name, Level: components.AlertOK, Expires: time.Now().Add(3 * time.Second)}
-				}
-				return c, components.AlertCmd(time.Now().UnixNano(), 3*time.Second)
-			}
+			return c, c.exportSelected()
+		case key.Matches(msg, c.keys.Enter):
+			c.openFullView()
+			return c, nil
 		}
 	}
 	return c, nil
+}
+
+// copySelected copies the highlighted prompt to the clipboard, returns the
+// alert-clear Cmd.
+func (c *Chat) copySelected() tea.Cmd {
+	filtered := c.filteredPrompts()
+	if c.cursor >= len(filtered) {
+		return nil
+	}
+	if err := clipboard.Copy(filtered[c.cursor].FullText); err != nil {
+		c.alert = components.Alert{Text: err.Error(), Level: components.AlertErr, Expires: time.Now().Add(3 * time.Second)}
+	} else {
+		c.alert = components.Alert{Text: "copied to clipboard", Level: components.AlertOK, Expires: time.Now().Add(2 * time.Second)}
+	}
+	return components.AlertCmd(time.Now().UnixNano(), 2*time.Second)
+}
+
+// exportSelected writes the highlighted prompt to a file in the current
+// directory, returns the alert-clear Cmd.
+func (c *Chat) exportSelected() tea.Cmd {
+	filtered := c.filteredPrompts()
+	if c.cursor >= len(filtered) {
+		return nil
+	}
+	name := fmt.Sprintf("claude-prompt-%s.txt", filtered[c.cursor].Time.Format("2006-01-02-150405"))
+	cwd, _ := os.Getwd()
+	out := filepath.Join(cwd, name)
+	if err := os.WriteFile(out, []byte(filtered[c.cursor].FullText), 0o644); err != nil {
+		c.alert = components.Alert{Text: err.Error(), Level: components.AlertErr, Expires: time.Now().Add(3 * time.Second)}
+	} else {
+		c.alert = components.Alert{Text: "exported " + name, Level: components.AlertOK, Expires: time.Now().Add(3 * time.Second)}
+	}
+	return components.AlertCmd(time.Now().UnixNano(), 3*time.Second)
+}
+
+// renderFullView lays out the full-screen single-prompt view: chat header
+// on top, the wrapped/scrollable prompt content in the middle, and a
+// minimal footer with relevant shortcuts + the prompt's token meta line.
+func (c *Chat) renderFullView() string {
+	hint := "↑/↓ scroll · c copy · e export · esc back · q quit"
+	header := components.Header(c.theme, *c.cfg, components.HeaderInput{
+		Session: &c.session,
+		Dir:     &c.dir,
+		HintRow: hint,
+		Width:   c.width,
+	})
+
+	contentH := c.height - 5
+	if contentH < 5 {
+		contentH = 5
+	}
+	c.fullView.Height = contentH
+	body := c.fullView.View()
+
+	// Footer: meta line for the focused prompt (mem indicator joins on right via app.View).
+	var footer string
+	switch {
+	case c.alert.Text != "":
+		footer = components.RenderAlert(c.theme, c.alert)
+	default:
+		filtered := c.filteredPrompts()
+		if c.cursor < len(filtered) {
+			footer = previewMetaLine(c.theme, filtered[c.cursor])
+		}
+	}
+	return header + "\n\n" + body + "\n" + footer
+}
+
+// openFullView populates fullView with the selected prompt's content
+// wrapped to the screen width and switches the chat into full-view mode.
+func (c *Chat) openFullView() {
+	filtered := c.filteredPrompts()
+	if c.cursor >= len(filtered) {
+		return
+	}
+	p := filtered[c.cursor]
+	contentW := c.width - 4
+	if contentW < 20 {
+		contentW = 20
+	}
+	contentH := c.height - 5
+	if contentH < 5 {
+		contentH = 5
+	}
+	c.fullView = viewport.New(contentW, contentH)
+	wrapStyle := lipgloss.NewStyle().Width(contentW)
+	var b strings.Builder
+	for i, line := range strings.Split(p.FullText, "\n") {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString(wrapStyle.Render(line))
+	}
+	c.fullView.SetContent(b.String())
+	c.fullView.GotoTop()
+	c.fullViewActive = true
 }
 
 // View renders the screen.
@@ -409,7 +514,10 @@ func (c *Chat) View() string {
 			Width:    c.width, Height: c.height,
 		})
 	}
-	hint := "↑/↓ nav · enter open · ctrl+f search · ctrl+y copy · ctrl+o save · ctrl+l layout · ctrl+↑/↓ rows · alt+↑/↓ pane · h help · ctrl+r reload · esc menu"
+	if c.fullViewActive {
+		return c.renderFullView()
+	}
+	hint := "↑/↓ nav · enter open · f search · c copy · e export · l layout · ctrl+↑/↓ rows · alt+↑/↓ pane · h help · r reload · esc menu"
 	header := components.Header(c.theme, *c.cfg, components.HeaderInput{
 		Session: &c.session,
 		Dir:     &c.dir,
