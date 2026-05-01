@@ -21,7 +21,7 @@ func (defaultTheme) Accent() lipgloss.Style {
 	return lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#56b6c2"))
 }
 func (defaultTheme) AccentAlt() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color("#c678dd"))
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#d19a66"))
 }
 func (defaultTheme) Active() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("#50c878"))
