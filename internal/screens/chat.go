@@ -63,7 +63,7 @@ type Chat struct {
 	layout       string // "bottom" | "right"
 	swapped      bool   // invert pane order within the layout
 	previewSize  int    // 30..80
-	previewRows  int    // 1..8 (wrapped lines per prompt in list)
+	previewRows  int    // 1..5 (wrapped lines per prompt in list)
 	searchActive bool
 	searchInput  textinput.Model
 	filter       string
@@ -104,6 +104,9 @@ func NewChat(repo data.Repository, cfg *config.Config, t theme.Theme, k keys.Map
 	}
 	if c.previewRows == 0 {
 		c.previewRows = 2
+	}
+	if c.previewRows > 5 {
+		c.previewRows = 5
 	}
 	c.preview = viewport.New(40, 10)
 	c.loadPrompts()
@@ -383,7 +386,7 @@ func (c *Chat) Update(msg tea.Msg) (Screen, tea.Cmd) {
 				c.recomputePanes()
 			}
 		case key.Matches(msg, c.keys.RowsUp):
-			if c.previewRows < 8 {
+			if c.previewRows < 5 {
 				c.previewRows++
 				c.cfg.PreviewRows = c.previewRows
 				_ = config.Save(c.cfg)
