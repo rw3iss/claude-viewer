@@ -163,7 +163,8 @@ func (c *Chat) refreshPreview() {
 func previewMetaLine(t theme.Theme, p data.Prompt) string {
 	parts := []string{}
 	if p.Model != "" {
-		parts = append(parts, t.AccentAlt().Render(p.Model))
+		modelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#61afef"))
+		parts = append(parts, modelStyle.Render(p.Model))
 	}
 	if !p.Pending && p.Took > 0 {
 		parts = append(parts, t.Subtitle().Render(formatDelta(p.Took, false)))
