@@ -406,6 +406,8 @@ func (c *Chat) Update(msg tea.Msg) (Screen, tea.Cmd) {
 		case key.Matches(msg, c.keys.Enter):
 			c.openFullView()
 			return c, nil
+		default:
+			dbg.Logf("Chat.unmatched key: %q", msg.String())
 		}
 	}
 	return c, nil
