@@ -149,7 +149,7 @@ cv                       # alias for `claude-viewer`
 | `e`            | export highlighted prompt to `$CWD/claude-prompt-…txt` |
 | `l`            | toggle bottom ↔ right preview layout                   |
 | `]`            | swap pane order (list ↔ preview)                       |
-| `ctrl+↑/↓`     | wrap rows per prompt (1–8)                             |
+| `alt++ / alt+-` | wrap rows per prompt (1–8)                            |
 | `alt+↑/↓`      | grow/shrink the preview pane                           |
 | `r`            | reload from disk                                       |
 | `esc`          | menu (or close full-screen view if open)               |

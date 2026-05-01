@@ -406,8 +406,6 @@ func (c *Chat) Update(msg tea.Msg) (Screen, tea.Cmd) {
 		case key.Matches(msg, c.keys.Enter):
 			c.openFullView()
 			return c, nil
-		default:
-			dbg.Logf("Chat.unmatched key: %q", msg.String())
 		}
 	}
 	return c, nil
@@ -527,7 +525,7 @@ func (c *Chat) View() string {
 	if c.fullViewActive {
 		return c.renderFullView()
 	}
-	hint := "↑/↓ nav · enter open · f search · c copy · e export · l layout · ] swap · ctrl+↑/↓ rows · alt+↑/↓ pane · h help · r reload · esc menu"
+	hint := "↑/↓ nav · enter open · f search · c copy · e export · l layout · ] swap · alt+±  rows · alt+↑/↓ pane · h help · r reload · esc menu"
 	header := components.Header(c.theme, *c.cfg, components.HeaderInput{
 		Session: &c.session,
 		Dir:     &c.dir,
