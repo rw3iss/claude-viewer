@@ -26,6 +26,7 @@ type Map struct {
 	RowsDown key.Binding
 	PaneUp   key.Binding
 	PaneDown key.Binding
+	HideList key.Binding
 	Home     key.Binding
 	End      key.Binding
 	PageUp   key.Binding
@@ -62,6 +63,7 @@ func Default() Map {
 		RowsDown: key.NewBinding(key.WithKeys("alt+-", "ctrl+down"), key.WithHelp("alt+-", "fewer rows")),
 		PaneUp:   key.NewBinding(key.WithKeys("alt+up"), key.WithHelp("alt+↑", "smaller preview")),
 		PaneDown: key.NewBinding(key.WithKeys("alt+down"), key.WithHelp("alt+↓", "bigger preview")),
+		HideList: key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "hide/show message list")),
 		Home:     key.NewBinding(key.WithKeys("home", "g")),
 		End:      key.NewBinding(key.WithKeys("end", "G")),
 		PageUp:   key.NewBinding(key.WithKeys("pgup")),

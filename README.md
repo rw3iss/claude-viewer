@@ -149,6 +149,7 @@ cv                       # alias for `claude-viewer`
 | `e`            | export highlighted prompt to `$CWD/claude-prompt-…txt` |
 | `l`            | toggle bottom ↔ right preview layout                   |
 | `]`            | swap pane order (list ↔ preview)                       |
+| `m`            | hide/show the message list (preview-only mode)         |
 | `alt++ / alt+-` | wrap rows per prompt (1–5)                            |
 | `alt+↑/↓`      | grow/shrink the preview pane                           |
 | `r`            | reload from disk                                       |
@@ -228,6 +229,7 @@ preview_rows  = 2
 preview_size  = 60       # %
 layout        = "bottom"  # or "right"
 layout_swap   = false     # invert pane order within the chosen layout
+list_hidden   = false     # hide the message-list pane (preview-only mode)
 
 # Dirs the user explicitly hid (overrides auto-detect):
 disabled = []

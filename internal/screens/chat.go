@@ -62,6 +62,7 @@ type Chat struct {
 
 	layout       string // "bottom" | "right"
 	swapped      bool   // invert pane order within the layout
+	listHidden   bool   // hide the message-list pane; preview takes full body
 	previewSize  int    // 30..80
 	previewRows  int    // 1..5 (wrapped lines per prompt in list)
 	searchActive bool
@@ -92,6 +93,7 @@ func NewChat(repo data.Repository, cfg *config.Config, t theme.Theme, k keys.Map
 		dir:         d,
 		layout:      cfg.Layout,
 		swapped:     cfg.LayoutSwap,
+		listHidden:  cfg.ListHidden,
 		previewSize: cfg.PreviewSize,
 		previewRows: cfg.PreviewRows,
 		searchInput: ti,
@@ -239,6 +241,13 @@ func (c *Chat) recomputePanes() {
 func (c *Chat) paneSizes() (listW, listH, prevW, prevH int) {
 	bodyH := c.height - 5
 	bodyH = max(bodyH, 5)
+	if c.listHidden {
+		// Preview pane occupies the entire body; list pane reports zero so
+		// callers that branch on >0 don't try to draw it.
+		prevW = c.width - 2
+		prevH = bodyH
+		return
+	}
 	if c.layout == "right" {
 		prevW = c.width * c.previewSize / 100
 		listW = c.width - prevW - dividerW
@@ -371,6 +380,11 @@ func (c *Chat) Update(msg tea.Msg) (Screen, tea.Cmd) {
 			c.swapped = !c.swapped
 			c.cfg.LayoutSwap = c.swapped
 			_ = config.Save(c.cfg)
+		case key.Matches(msg, c.keys.HideList):
+			c.listHidden = !c.listHidden
+			c.cfg.ListHidden = c.listHidden
+			_ = config.Save(c.cfg)
+			c.recomputePanes()
 		case key.Matches(msg, c.keys.PaneUp):
 			if c.previewSize > 30 {
 				c.previewSize -= 5
@@ -528,7 +542,10 @@ func (c *Chat) View() string {
 	if c.fullViewActive {
 		return c.renderFullView()
 	}
-	hint := "↑/↓ nav · enter open · f search · c copy · e export · l layout · ] swap · alt+±  rows · alt+↑/↓ pane · h help · r reload · esc menu"
+	hint := "↑/↓ nav · enter open · f search · c copy · e export · l layout · ] swap · m list · alt+±  rows · alt+↑/↓ pane · h help · r reload · esc menu"
+	if c.listHidden {
+		hint = "↑/↓ nav · enter open · f search · c copy · e export · m show list · h help · r reload · esc menu"
+	}
 	header := components.Header(c.theme, *c.cfg, components.HeaderInput{
 		Session: &c.session,
 		Dir:     &c.dir,
@@ -537,25 +554,29 @@ func (c *Chat) View() string {
 	})
 
 	listW, listH, prevW, prevH := c.paneSizes()
-	listView := c.renderList(listW, listH)
-	previewView := c.renderPreview(prevW, prevH)
 
 	var body string
-	if c.layout == "right" {
-		divider := verticalDivider(c.theme, listH)
-		if c.swapped {
-			body = lipgloss.JoinHorizontal(lipgloss.Top, previewView, divider, listView)
-		} else {
-			body = lipgloss.JoinHorizontal(lipgloss.Top, listView, divider, previewView)
-		}
+	if c.listHidden {
+		body = c.renderPreview(prevW, prevH)
 	} else {
-		borderW := c.width - 2
-		borderW = max(borderW, 1)
-		hr := c.theme.Border().Render(strings.Repeat("─", borderW))
-		if c.swapped {
-			body = previewView + "\n" + hr + "\n" + listView
+		listView := c.renderList(listW, listH)
+		previewView := c.renderPreview(prevW, prevH)
+		if c.layout == "right" {
+			divider := verticalDivider(c.theme, listH)
+			if c.swapped {
+				body = lipgloss.JoinHorizontal(lipgloss.Top, previewView, divider, listView)
+			} else {
+				body = lipgloss.JoinHorizontal(lipgloss.Top, listView, divider, previewView)
+			}
 		} else {
-			body = listView + "\n" + hr + "\n" + previewView
+			borderW := c.width - 2
+			borderW = max(borderW, 1)
+			hr := c.theme.Border().Render(strings.Repeat("─", borderW))
+			if c.swapped {
+				body = previewView + "\n" + hr + "\n" + listView
+			} else {
+				body = listView + "\n" + hr + "\n" + previewView
+			}
 		}
 	}
 

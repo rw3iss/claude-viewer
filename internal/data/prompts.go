@@ -206,9 +206,16 @@ func cleanText(s string) string {
 
 // cleanFullText is for the full-content preview pane: same tag handling
 // but newlines/indentation are preserved so the text reads naturally.
+//
+// Stray carriage returns (\r\n from Windows line-endings, or standalone
+// \r from JSON-as-string copy-paste) are normalized to \n so the terminal
+// doesn't interpret them as cursor-to-column-0 and overwrite adjacent
+// panes when the prompt is wrapped into the right-hand preview.
 func cleanFullText(s string) string {
 	s = tagBlock.ReplaceAllString(s, "")
 	s = unwrapCommandTags(s)
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "\n")
 	return strings.TrimSpace(s)
 }
 

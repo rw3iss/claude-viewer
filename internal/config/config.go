@@ -48,6 +48,10 @@ type Config struct {
 	// preview goes above the list.
 	LayoutSwap bool `toml:"layout_swap"`
 
+	// ListHidden hides the message-list pane entirely so the preview pane
+	// occupies the full body. Toggled by `m` in the chat screen.
+	ListHidden bool `toml:"list_hidden"`
+
 	// HeaderShow* toggles header widgets.
 	HeaderShowName bool `toml:"header_show_name"`
 	HeaderShowDir  bool `toml:"header_show_dir"`

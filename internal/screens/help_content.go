@@ -78,6 +78,7 @@ func helpForChat() []components.HelpSection {
 		{Title: "Layout", Entries: []components.HelpEntry{
 			{Key: "l", Desc: "toggle bottom ↔ right preview layout"},
 			{Key: "]", Desc: "swap pane order (list ↔ preview)"},
+			{Key: "m", Desc: "hide/show the message list (preview-only)"},
 			{Key: "alt+± ", Desc: "wrap rows per prompt (1–5)"},
 			{Key: "alt+↑/↓", Desc: "grow/shrink the preview pane"},
 		}},
